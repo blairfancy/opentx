@@ -77,9 +77,9 @@ if(MULTIMODULE)
   add_definitions(-DMULTIMODULE)
   set(SRC ${SRC} pulses/multi_arm.cpp telemetry/spektrum.cpp telemetry/flysky_ibus.cpp telemetry/multi.cpp)
 endif()
-add_definitions(-DCPUARM -DVIRTUAL_INPUTS)
-add_definitions(-DTELEMETRY_FRSKY -DTELEMETRY_FRSKY_SPORT -DFRSKY_HUB -DGPS -DPXX -DDSM2)
-add_definitions(-DBOLD_FONT -DBATTGRAPH -DTHRTRACE -DGAUGES)
+add_definitions(-DCPUARM)
+add_definitions(-DTELEMETRY_FRSKY -DTELEMETRY_FRSKY_SPORT -DGPS -DPXX -DDSM2)
+add_definitions(-DBOLD_FONT -DBATTGRAPH -DTHRTRACE)
 add_definitions(-DREQUIRED_SDCARD_VERSION="${SDCARD_VERSION}")
 include_directories(${COOS_DIR} ${COOS_DIR}/kernel ${COOS_DIR}/portable)
 foreach(LANGUAGE ${TTS_LANGUAGES})
@@ -125,11 +125,20 @@ set(FIRMWARE_SRC
   ${COOS_DIR}/portable/GCC/port.c
   ${COOS_DIR}/portable/arch.c
   )
+
 set(PULSES_SRC
   ${PULSES_SRC}
   pulses_arm.cpp
   ppm_arm.cpp
-  pxx_arm.cpp
+  pxx.cpp
+  pxx1.cpp
   dsm2_arm.cpp
   sbus_arm.cpp
   )
+
+if(PXX2)
+  set(PULSES_SRC
+    ${PULSES_SRC}
+    pxx2.cpp
+    )
+endif()

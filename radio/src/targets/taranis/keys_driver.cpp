@@ -148,6 +148,10 @@ void readKeysAndTrims()
   for (uint8_t i = 1; i != uint8_t(1 << 8); i <<= 1) {
     keys[index++].input(trims_input & i);
   }
+<<<<<<< HEAD
+=======
+
+>>>>>>> 2.3
 #if defined(PWR_BUTTON_PRESS)
   if ((keys_input || trims_input || pwrPressed()) && (g_eeGeneral.backlightMode & e_backlight_mode_keys)) {
 #else

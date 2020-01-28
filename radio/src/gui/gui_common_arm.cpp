@@ -655,6 +655,7 @@ int getFirstAvailable(int min, int max, IsValueAvailable isValueAvailable)
 // we don't need the special eeprom/flash string handling, just define them as
 // local strings
 
+<<<<<<< HEAD
 const pm_char STR_SUBTYPE_FLYSKY[] PROGMEM =     "\004""Std\0""V9x9""V6x6""V912""CX20";
 const pm_char STR_SUBTYPE_HUBSAN[] PROGMEM =     "\005"" H107"" H301"" H501";
 const pm_char STR_SUBTYPE_FRSKY[] PROGMEM =      "\007""D16\0   ""D8\0    ""D16 8ch""V8\0    ""LBT(EU)""LBT 8ch";
@@ -681,6 +682,34 @@ const pm_char STR_SUBTYPE_H83D[] PROGMEM =       "\007""Std\0   ""H20H\0  ""H20M
 const pm_char STR_SUBTYPE_CORONA[] PROGMEM =     "\006"" V1\0  "" V2\0  "" FD V3";
 const pm_char STR_SUBTYPE_HITEC[] PROGMEM =      "\007""Optima\0""Opt Hub""Minima\0";
 const pm_char STR_SUBTYPE_E01X[] PROGMEM =       "\004""E012""E015";
+=======
+const char STR_SUBTYPE_FLYSKY[] = 	"\004""Std\0""V9x9""V6x6""V912""CX20";
+const char STR_SUBTYPE_HUBSAN[] = 	"\005"" H107"" H301"" H501";
+const char STR_SUBTYPE_FRSKY[] =  	"\007""D16\0   ""D8\0    ""D16 8ch""V8\0    ""LBT(EU)""LBT 8ch";
+const char STR_SUBTYPE_HISKY[] =  	"\005""Std\0 ""HK310";
+const char STR_SUBTYPE_V2X2[] =   	"\006""Std\0  ""JXD506";
+const char STR_SUBTYPE_DSM[] =    	"\006""2 22ms""2 11ms""X 22ms""X 11ms";
+const char STR_SUBTYPE_YD717[] =  	"\007""Std\0   ""SkyWlkr""Syma X4""XINXUN\0""NIHUI\0 ";
+const char STR_SUBTYPE_KN[] =     	"\006""WLtoys""FeiLun";
+const char STR_SUBTYPE_SYMAX[] =  	"\003""Std""X5C";
+const char STR_SUBTYPE_SLT[] =    	"\006""V1_6ch""V2_8ch""Q100\0 ""Q200\0 ""MR100\0";
+const char STR_SUBTYPE_CX10[] =   	"\007""Green\0 ""Blue\0  ""DM007\0 ""-\0     ""JC3015a""JC3015b""MK33041";
+const char STR_SUBTYPE_CG023[] =  	"\005""Std\0 ""YD829";
+const char STR_SUBTYPE_BAYANG[] = 	"\007"" Std\0  "" H8S3D\0"" X16 AH""IRDrone";
+const char STR_SUBTYPE_MT99[] =   	"\006"" MT99\0"" H7\0  "" YZ\0  "" LS\0  "" FY805";
+const char STR_SUBTYPE_MJXQ[] =   	"\005""WLH08""X600\0""X800\0""H26D\0""E010\0""H26WH";
+const char STR_SUBTYPE_FY326[] =  	"\005""Std\0 ""FY319";
+const char STR_SUBTYPE_HONTAI[] = 	"\007"" Std\0  ""JJRC X1"" X5C1\0 "" FQ_951";
+const char STR_SUBTYPE_AFHDS2A[] =	"\010""PWM,IBUS""PPM,IBUS""PWM,SBUS""PPM,SBUS";
+const char STR_SUBTYPE_Q2X2[] =   	"\004""Q222""Q242""Q282";
+const char STR_SUBTYPE_WK2x01[] = 	"\006""WK2801""WK2401""W6_5_1""W6_6_1""W6_HeL""W6_HeI";
+const char STR_SUBTYPE_Q303[] =   	"\006""Std\0  ""CX35\0 ""CX10D\0""CX10WD";
+const char STR_SUBTYPE_CABELL[] = 	"\007""V3\0    ""V3 Telm""-\0     ""-\0     ""-\0     ""-\0     ""F-Safe\0""Unbind\0";
+const char STR_SUBTYPE_H83D[] =   	"\007""Std\0   ""H20H\0  ""H20Mini""H30Mini";
+const char STR_SUBTYPE_CORONA[] = 	"\006"" V1\0  "" V2\0  "" FD V3";
+const char STR_SUBTYPE_HITEC[] =  	"\007""Optima\0""Opt Hub""Minima\0";
+const char STR_SUBTYPE_E01X[] =  	"\004""E012""E015";
+>>>>>>> 2.3
 
 const mm_protocol_definition multi_protocols[] = {
 

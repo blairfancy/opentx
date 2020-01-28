@@ -6,7 +6,11 @@ branch=2.2
 docker=nightly22
 workdir=/home/opentx/nightly22
 output=/var/www/html/2.2/nightlies
+<<<<<<< HEAD
 version=2.2.4
+=======
+version=2.3.0
+>>>>>>> 2.3
 
 # Incrementnightly index
 index=`cat index.txt`

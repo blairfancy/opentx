@@ -21,7 +21,7 @@
 #include "opentx.h"
 
 #if !defined(BOOT)
-const pm_char s_charTab[] PROGMEM = "_-.,";
+const char s_charTab[]  = "_-.,";
 
 char hex2zchar(uint8_t hex)
 {
@@ -37,14 +37,13 @@ char idx2char(int8_t idx)
   }
   if (idx < 27) return 'A' + idx - 1;
   if (idx < 37) return '0' + idx - 27;
-  if (idx <= 40) return pgm_read_byte(s_charTab+idx-37);
+  if (idx <= 40) return *(s_charTab+idx-37);
 #if LEN_SPECIAL_CHARS > 0
   if (idx <= (LEN_STD_CHARS + LEN_SPECIAL_CHARS)) return 'z' + 5 + idx - 40;
 #endif
   return ' ';
 }
 
-#if defined(CPUARM) || defined(SIMU)
 int8_t char2idx(char c)
 {
   if (c == '_') return 37;
@@ -78,9 +77,7 @@ int zchar2str(char * dest, const char * src, int size)
   } while (size >= 0 && dest[size] == ' ');
   return size+1;
 }
-#endif
 
-#if defined(CPUARM)
 unsigned int effectiveLen(const char * str, unsigned int size)
 {
   while (size > 0) {
@@ -143,9 +140,8 @@ char * strcat_zchar(char * dest, const char * name, uint8_t size, const char * d
   return &dest[len];
 }
 #endif
-#endif
 
-#if defined(CPUARM) && !defined(BOOT)
+#if !defined(BOOT)
 char * getStringAtIndex(char * dest, const char * s, int idx)
 {
   uint8_t len = s[0];
@@ -306,7 +302,7 @@ char * getSwitchString(char * dest, swsrc_t idx)
     getStringAtIndex(s, STR_VSWITCHES, IDX_ON_IN_STR_VSWITCHES + idx - SWSRC_ON);
   }
   else if (idx <= SWSRC_LAST_FLIGHT_MODE) {
-    strAppendStringWithIndex(s, STR_FP, idx-SWSRC_FIRST_FLIGHT_MODE);
+    strAppendStringWithIndex(s, STR_FM, idx-SWSRC_FIRST_FLIGHT_MODE);
   }
   else if (idx == SWSRC_TELEMETRY_STREAMING) {
     strcpy(s, "Tele");
@@ -438,7 +434,6 @@ char * strAppendSigned(char * dest, int32_t value, uint8_t digits, uint8_t radix
   return strAppendUnsigned(dest, (uint32_t)value, digits, radix);
 }
 
-#if defined(CPUARM) || defined(SDCARD)
 char * strAppend(char * dest, const char * source, int len)
 {
   while ((*dest++ = *source++)) {
@@ -515,5 +510,4 @@ char * strAppendDate(char * str, bool time)
     return &str[11];
   }
 }
-#endif
 #endif

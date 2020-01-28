@@ -82,7 +82,7 @@ Open9xSim::Open9xSim(FXApp* a):
   FXMainWindow(a, "OpenTX Simu", NULL, NULL, DECOR_ALL, 20, 90, 0, 0)
 {
   firstTime = true;
-  memset(displayBuf, 0, DISPLAY_BUFFER_SIZE);
+  memset(displayBuf, 0, DISPLAY_BUFFER_SIZE * sizeof(display_t));
   bmp = new FXPPMImage(getApp(),NULL,IMAGE_OWNED|IMAGE_KEEP|IMAGE_SHMI|IMAGE_SHMP, W2, H2);
 
 #if defined(SIMU_AUDIO)
@@ -589,9 +589,6 @@ uint16_t anaIn(uint8_t chan)
     return 5.1*1500/11.3;
   else if (chan == TX_CURRENT)
     return 100;
-#elif defined(PCBGRUVIN9X)
-  else if (chan == TX_VOLTAGE)
-    return 150;
 #else
   else if (chan == TX_VOLTAGE)
     return 1500;

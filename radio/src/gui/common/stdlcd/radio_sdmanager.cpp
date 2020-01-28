@@ -64,7 +64,7 @@ inline bool isFilenameLower(bool isfile, const char * fn, const char * line)
 void getSelectionFullPath(char * lfn)
 {
   f_getcwd(lfn, _MAX_LFN);
-  strcat(lfn, PSTR("/"));
+  strcat(lfn, "/");
   strcat(lfn, reusableBuffer.sdmanager.lines[menuVerticalPosition - HEADER_LINE - menuVerticalOffset]);
 }
 
@@ -83,7 +83,6 @@ void onSdManagerMenu(const char * result)
   else if (result == STR_SD_FORMAT) {
     POPUP_CONFIRMATION(STR_CONFIRM_FORMAT);
   }
-#if defined(CPUARM)
   else if (result == STR_COPY_FILE) {
     clipboard.type = CLIPBOARD_TYPE_SD_FILE;
     f_getcwd(clipboard.data.sd.directory, CLIPBOARD_PATH_LEN);
@@ -93,7 +92,7 @@ void onSdManagerMenu(const char * result)
     f_getcwd(lfn, _MAX_LFN);
     // if destination is dir, copy into that dir
     if (IS_DIRECTORY(line)) {
-      strcat(lfn, PSTR("/"));
+      strcat(lfn, "/");
       strcat(lfn, line);
     }
     if (strcmp(clipboard.data.sd.directory, lfn)) {  // prevent copying to the same directory
@@ -111,22 +110,19 @@ void onSdManagerMenu(const char * result)
     s_editMode = EDIT_MODIFY_STRING;
     editNameCursorPos = 0;
   }
-#endif
   else if (result == STR_DELETE_FILE) {
     getSelectionFullPath(lfn);
     f_unlink(lfn);
     strncpy(statusLineMsg, line, 13);
-    strcpy_P(statusLineMsg+min((uint8_t)strlen(statusLineMsg), (uint8_t)13), STR_REMOVED);
+    strcpy(statusLineMsg+min((uint8_t)strlen(statusLineMsg), (uint8_t)13), STR_REMOVED);
     showStatusLine();
     REFRESH_FILES();
   }
-#if defined(CPUARM)
   else if (result == STR_PLAY_FILE) {
     getSelectionFullPath(lfn);
     audioQueue.stopAll();
     audioQueue.playFile(lfn, 0, ID_PLAY_FROM_SD_MANAGER);
   }
-#endif
 #if LCD_DEPTH > 1
   else if (result == STR_ASSIGN_BITMAP) {
     strAppendFilename(g_model.header.bitmap, line, sizeof(g_model.header.bitmap));
@@ -134,12 +130,10 @@ void onSdManagerMenu(const char * result)
     storageDirty(EE_MODEL);
   }
 #endif
-#if defined(CPUARM)
   else if (result == STR_VIEW_TEXT) {
     getSelectionFullPath(lfn);
     pushMenuTextView(lfn);
   }
-#endif
 #if defined(PCBTARANIS)
   else if (result == STR_FLASH_BOOTLOADER) {
     getSelectionFullPath(lfn);
@@ -176,9 +170,7 @@ void menuRadioSdManager(event_t _event)
 #if defined(PCBSKY9X)
     Card_state = SD_ST_DATA;
 #endif
-#if defined(CPUARM)
     audioQueue.stopSD();
-#endif
     if(sdCardFormat()) {
       f_chdir("/");
       REFRESH_FILES();
@@ -258,7 +250,6 @@ void menuRadioSdManager(event_t _event)
         if (!strcmp(line, "..")) {
           break; // no menu for parent dir
         }
-#if defined(CPUARM)
         const char * ext = getFileExtension(line);
         if (ext) {
           if (!strcasecmp(ext, SOUNDS_EXT)) {
@@ -295,15 +286,12 @@ void menuRadioSdManager(event_t _event)
           }
 #endif
         }
-#endif
         if (!READ_ONLY()) {
-#if defined(CPUARM)
           if (IS_FILE(line))
             POPUP_MENU_ADD_ITEM(STR_COPY_FILE);
           if (clipboard.type == CLIPBOARD_TYPE_SD_FILE)
             POPUP_MENU_ADD_ITEM(STR_PASTE);
           POPUP_MENU_ADD_ITEM(STR_RENAME_FILE);
-#endif
           if (IS_FILE(line))
             POPUP_MENU_ADD_ITEM(STR_DELETE_FILE);
         }
@@ -404,7 +392,6 @@ void menuRadioSdManager(event_t _event)
       if (IS_DIRECTORY(reusableBuffer.sdmanager.lines[i])) {
         lcdDrawChar(0, y, '[', s_editMode == EDIT_MODIFY_STRING ? 0 : attr);
       }
-#if defined(CPUARM)
       if (s_editMode == EDIT_MODIFY_STRING && attr) {
         uint8_t extlen, efflen;
         const char * ext = getFileExtension(reusableBuffer.sdmanager.originalName, 0, 0, NULL, &extlen);
@@ -424,9 +411,6 @@ void menuRadioSdManager(event_t _event)
       else {
         lcdDrawText(lcdNextPos, y, reusableBuffer.sdmanager.lines[i], attr);
       }
-#else
-      lcdDrawText(lcdNextPos, y, reusableBuffer.sdmanager.lines[i], attr);
-#endif
       if (IS_DIRECTORY(reusableBuffer.sdmanager.lines[i])) {
         lcdDrawChar(lcdNextPos, y, ']', s_editMode == EDIT_MODIFY_STRING ? 0 : attr);
       }

@@ -98,15 +98,13 @@ void init_second_ppm(uint32_t period)
   Pwm * pwmptr = PWM;
   configure_pins(PIO_PC15, PIN_PERIPHERAL | PIN_INPUT | PIN_PER_B | PIN_PORTC | PIN_NO_PULLUP);
   pwmptr->PWM_CH_NUM[1].PWM_CMR = 0x0000000B;                          // CLKB
-  if (!GET_PPM_POLARITY(EXTRA_MODULE)) {
-    pwmptr->PWM_CH_NUM[1].PWM_CMR |= 0x00000200;                       // CPOL
-  }
   pwmptr->PWM_CH_NUM[1].PWM_CPDR = period;                             // Period
   pwmptr->PWM_CH_NUM[1].PWM_CPDRUPD = period;                          // Period
   pwmptr->PWM_CH_NUM[1].PWM_CDTY = GET_PPM_DELAY(EXTRA_MODULE)*2;      // Duty
-  pwmptr->PWM_CH_NUM[1].PWM_CDTYUPD = GET_PPM_DELAY(EXTRA_MODULE)*2;   // Duty
   pwmptr->PWM_ENA = PWM_ENA_CHID1;                                     // Enable channel 1
   pwmptr->PWM_IER1 = PWM_IER1_CHID1;
+    
+  setExtraModulePolarity() ;
 #endif
 }
 
@@ -177,7 +175,7 @@ void init_ssc(uint8_t baudrateDiv1000)
   sscptr->SSC_CR = SSC_CR_TXEN;
 
 #if defined(REVX)
-  if (IS_MODULE_MULTIMODULE(EXTERNAL_MODULE)) {
+  if (isModuleMultimodule(EXTERNAL_MODULE)) {
     PIOA->PIO_MDDR = PIO_PA17;                 // Push Pull O/p in A17
   } else {
     PIOA->PIO_MDER = PIO_PA17;						// Open Drain O/p in A17
@@ -278,8 +276,8 @@ extern "C" void PWM_IRQHandler(void)
         else {
           // Kick off serial output here
           Ssc * sscptr = SSC;
-          sscptr->SSC_TPR = CONVERT_PTR_UINT(modulePulsesData[EXTERNAL_MODULE].pxx.pulses);
-          sscptr->SSC_TCR = (uint8_t *)modulePulsesData[EXTERNAL_MODULE].pxx.ptr - (uint8_t *)modulePulsesData[EXTERNAL_MODULE].pxx.pulses;
+          sscptr->SSC_TPR = CONVERT_PTR_UINT(modulePulsesData[EXTERNAL_MODULE].pxx.getData());
+          sscptr->SSC_TCR = modulePulsesData[EXTERNAL_MODULE].pxx.getSize();
           sscptr->SSC_PTCR = SSC_PTCR_TXTEN;        // Start transfers
         }
         break;

@@ -173,14 +173,25 @@ struct AudioFragment {
     strcpy(file, filename);
   }
 
-  void clear() { memset(this, 0, sizeof(AudioFragment)); };
+  void clear()
+  {
+    memset(reinterpret_cast<void*>(this), 0, sizeof(AudioFragment));
+  }
 };
 
 class ToneContext {
   public:
 
-    inline void clear() { memset(this, 0, sizeof(ToneContext)); };
-    bool isFree() const { return fragment.type == FRAGMENT_EMPTY; };
+    inline void clear()
+    {
+      memset(reinterpret_cast<void*>(this), 0, sizeof(ToneContext));
+    }
+
+    bool isFree() const
+    {
+      return fragment.type == FRAGMENT_EMPTY;
+    }
+
     int mixBuffer(AudioBuffer *buffer, int volume, unsigned int fade);
 
     void setFragment(uint16_t freq, uint16_t duration, uint16_t pause, uint8_t repeat, int8_t freqIncr, bool reset, uint8_t id=0)
@@ -265,8 +276,10 @@ class MixedContext {
 
     int mixBuffer(AudioBuffer *buffer, int toneVolume, int wavVolume, unsigned int fade)
     {
-      if (isTone()) return tone.mixBuffer(buffer, toneVolume, fade);
-      else if (isFile()) return wav.mixBuffer(buffer, wavVolume, fade);
+      if (isTone())
+        return tone.mixBuffer(buffer, toneVolume, fade);
+      else if (isFile())
+        return wav.mixBuffer(buffer, wavVolume, fade);
       return 0;
     }
 
@@ -296,14 +309,17 @@ class AudioBufferFifo {
     {
       return (idx >= AUDIO_BUFFER_COUNT-1 ? 0 : idx+1);
     }
+
     bool full() const
     {
       return bufferFull;
     }
+
     bool empty() const
     {
       return (readIdx == writeIdx) && !bufferFull;
     }
+
     uint8_t used() const
     {
       return bufferFull ? AUDIO_BUFFER_COUNT : writeIdx - readIdx;
@@ -532,13 +548,8 @@ void audioTask(void * pdata);
   #define AUDIO_BUZZER(a, b)  b
 #endif
 
-#if defined(VOICE)
   #define AUDIO_ERROR_MESSAGE(e) audioEvent(e)
   #define AUDIO_TIMER_MINUTE(t)  playDuration(t, 0, 0)
-#else
-  #define AUDIO_ERROR_MESSAGE(e) audioEvent(AU_ERROR)
-  #define AUDIO_TIMER_MINUTE(t)  audioDefevent(AU_WARNING1)
-#endif
 
 void audioKeyPress();
 void audioKeyError();

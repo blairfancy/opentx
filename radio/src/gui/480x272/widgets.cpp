@@ -19,7 +19,6 @@
  */
 
 #include "opentx.h"
-#include <stdio.h>
 
 void drawStatusText(const char * text)
 {
@@ -34,8 +33,15 @@ void drawColumnHeader(const char * const * headers, const char * const * descrip
   }
 }
 
+static const uint8_t __alpha_button_on[] __ALIGNED(4) = {
 #include "alpha_button_on.lbm"
+};
+Bitmap ALPHA_BUTTON_ON(BMP_ARGB4444, (const uint16_t*)__alpha_button_on);
+
+static const uint8_t __alpha_button_off[] __ALIGNED(4) = {
 #include "alpha_button_off.lbm"
+};
+Bitmap ALPHA_BUTTON_OFF(BMP_ARGB4444, (const uint16_t*)__alpha_button_off);
 
 void drawButton(coord_t x, coord_t y, const char * label, LcdFlags attr)
 {

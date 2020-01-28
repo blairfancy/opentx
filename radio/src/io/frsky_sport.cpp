@@ -123,7 +123,8 @@ void sportProcessUpdatePacket(uint8_t * packet)
 bool sportWaitState(SportUpdateState state, int timeout)
 {
 #if defined(SIMU)
-  SIMU_SLEEP_NORET(1);
+  UNUSED(state);
+  UNUSED(timeout);
   return true;
 #else
   watchdogSuspend(timeout / 10);
@@ -138,7 +139,7 @@ bool sportWaitState(SportUpdateState state, int timeout)
     else if (sportUpdateState == SPORT_FAIL) {
       return false;
     }
-    CoTickDelay(1);
+    RTOS_WAIT_TICKS(1);
   }
   return false;
 #endif
@@ -313,7 +314,7 @@ void sportFlashDevice(ModuleIndex module, const char * filename)
 
   /* wait 2s off */
   watchdogSuspend(2000);
-  CoTickDelay(1000);
+  RTOS_WAIT_MS(2000);
 #endif
 
   const char * result = sportUpdatePowerOn(module);

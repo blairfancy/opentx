@@ -20,32 +20,26 @@
 
 #include "opentx.h"
 
-const pm_char * warningText = NULL;
-const pm_char * warningInfoText;
+const char * warningText = NULL;
+const char * warningInfoText;
 uint8_t         warningInfoLength;
 uint8_t         warningType;
 uint8_t         warningResult = 0;
 
-#if defined(CPUARM)
 uint8_t         warningInfoFlags = ZCHAR;
 int16_t         warningInputValue;
 int16_t         warningInputValueMin;
 int16_t         warningInputValueMax;
-#endif
 
 void drawMessageBox()
 {
   lcdDrawFilledRect(10, 16, LCD_W-20, 40, SOLID, ERASE);
   lcdDrawRect(10, 16, LCD_W-20, 40);
-#if defined(CPUARM)
   lcdDrawSizedText(WARNING_LINE_X, WARNING_LINE_Y, warningText, WARNING_LINE_LEN);
-#else
-  lcdDrawText(WARNING_LINE_X, WARNING_LINE_Y, warningText);
-#endif
   // could be a place for a warningInfoText
 }
 
-void showMessageBox(const pm_char * str)
+void showMessageBox(const char * str)
 {
   warningText = str;
   drawMessageBox();
@@ -53,11 +47,11 @@ void showMessageBox(const pm_char * str)
   lcdRefresh();
 }
 
-const pm_uchar ASTERISK_BITMAP[] PROGMEM = {
+const unsigned char ASTERISK_BITMAP[]  = {
 #include "asterisk.lbm"
 };
 
-void drawAlertBox(const pm_char * title, const pm_char * text, const char * action)
+void drawAlertBox(const char * title, const char * text, const char * action)
 {
   lcdClear();
   lcdDraw1bitBitmap(2, 0, ASTERISK_BITMAP, 0, 0);
@@ -83,7 +77,7 @@ void drawAlertBox(const pm_char * title, const pm_char * text, const char * acti
 #undef MESSAGE_LCD_OFFSET
 }
 
-void showAlertBox(const pm_char * title, const pm_char * text, const char * action ALERT_SOUND_ARG)
+void showAlertBox(const char * title, const char * text, const char * action , uint8_t sound)
 {
   drawAlertBox(title, text, action);
   
@@ -114,13 +108,11 @@ void runPopupWarning(event_t event)
       warningText = NULL;
       warningType = WARNING_TYPE_ASTERISK;
       break;
-#if defined(CPUARM)
     default:
       if (warningType != WARNING_TYPE_INPUT) break;
       s_editMode = EDIT_MODIFY_FIELD;
       warningInputValue = checkIncDec(event, warningInputValue, warningInputValueMin, warningInputValueMax);
       s_editMode = EDIT_SELECT_FIELD;
       break;
-#endif
   }
 }

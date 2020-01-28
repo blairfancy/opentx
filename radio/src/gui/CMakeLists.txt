@@ -3,7 +3,6 @@ set(GUI_SRC
   lcd.cpp
   splash.cpp
   fonts.cpp
-  navigation.cpp
   popups.cpp
   widgets.cpp
   menus.cpp
@@ -23,17 +22,10 @@ set(GUI_SRC
   )
 
 if(GUI_DIR STREQUAL 128x64)
-  if (ARCH STREQUAL ARM)
-    set(GUI_SRC
+   set(GUI_SRC
       ${GUI_SRC}
       model_outputs_arm.cpp
       )
-  else()
-    set(GUI_SRC
-      ${GUI_SRC}
-      model_outputs_avr.cpp
-      )
-  endif()
 else()
   set(GUI_SRC
     ${GUI_SRC}
@@ -44,7 +36,8 @@ endif()
 set(SRC
   ${SRC}
   gui/common/widgets.cpp
-  gui/common/navigation.cpp
+  gui/navigation/navigation_${NAVIGATION_TYPE}.cpp
+  gui/navigation/common.cpp
   )
 
 include_directories(gui gui/${GUI_DIR})

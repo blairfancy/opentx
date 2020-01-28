@@ -4,9 +4,12 @@ set(LUA_SCRIPT_LOAD_MODE "" CACHE STRING "Script loading mode and compilation fl
 option(LUA_COMPILER "Pre-compile and save Lua scripts" OFF)
 option(LUA_ALLOCATOR_TRACER "Trace Lua memory (de)allocations to debug port (also needs DEBUG=YES NANO=NO)" OFF)
 
+option(USB_SERIAL "Enable USB serial (CDC)" OFF)
+
 set(ARCH ARM)
 set(STM32USB_DIR ${THIRDPARTY_DIR}/STM32_USB-Host-Device_Lib_V2.2.0/Libraries)
 add_definitions(-DSTM32 -DLUA_INPUTS -DVARIO -DCROSSFIRE)
+
 include_directories(${RADIO_SRC_DIRECTORY}/targets/common/arm/stm32)
 include_directories(${STM32USB_DIR}/STM32_USB_OTG_Driver/inc)
 include_directories(${STM32USB_DIR}/STM32_USB_Device_Library/Core/inc)
@@ -39,7 +42,7 @@ set(FIRMWARE_TARGET_SRC
   ../common/arm/stm32/flash_driver.cpp
   )
 
-if(DEBUG OR CLI)
+if(DEBUG OR CLI OR USB_SERIAL)
   set(STM32USB_SRC
     ${STM32USB_SRC}
     STM32_USB_Device_Library/Class/cdc/src/usbd_cdc_core.c
@@ -88,11 +91,13 @@ foreach(FILE ${STM32USB_SRC})
     ${STM32USB_DIR}/${FILE}
     )
 endforeach()
+
 set(SRC
   ${SRC}
   telemetry/crossfire.cpp
   io/bootloader_flash.cpp
   )
+
 set(PULSES_SRC
   ${PULSES_SRC}
   crossfire.cpp

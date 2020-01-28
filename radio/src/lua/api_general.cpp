@@ -669,7 +669,7 @@ Return the internal GPS position or nil if no valid hardware found
  * 'speed' (number) internal GPSspeed in 0.1m/s
  * 'heading'  (number) internal GPS ground course estimation in degrees * 10
 
-@status current Introduced in 2.2.2
+@status current Introduced in 2.3.0
 */
 static int luaGetTxGPS(lua_State * L)
 {
@@ -912,7 +912,7 @@ Returns (some of) the general radio settings
  * `gtimer` (number) radio global timer in seconds (does not include current session)
 
 @status current Introduced in 2.0.6, `imperial` added in TODO,
-`language` and `voice` added in 2.2.0, gtimer added in 2.2.2.
+`language` and `voice` added in 2.2.0, gtimer added in 2.3.0.
 
 */
 static int luaGetGeneralSettings(lua_State * L)
@@ -1271,12 +1271,50 @@ static int luaGetUsage(lua_State * L)
 
 Resets the radio global timer to 0.
 
-@status current Introduced in 2.2.2
+@status current Introduced in 2.3.0
 */
 static int luaResetGlobalTimer(lua_State * L)
 {
   g_eeGeneral.globalTimer = 0;
   storageDirty(EE_GENERAL);
+  return 0;
+}
+
+/*luadoc
+@function serialWrite(str)
+@param str (string) String to be written to the serial port.
+
+Writes a string to the serial port. The string is allowed to contain any character, including 0.
+
+@status current Introducted in TODO
+*/
+static int luaSerialWrite(lua_State * L)
+{
+  const char * str = luaL_checkstring(L, 1);
+  size_t len = lua_rawlen(L, 1);
+
+  if (!str || len < 1)
+    return 0;
+
+#if !defined(SIMU)
+  #if defined(USB_SERIAL)
+  if (getSelectedUsbMode() == USB_SERIAL_MODE) {
+    size_t wr_len = len;
+    const char* p = str;
+    while(wr_len--) usbSerialPutc(*p++);
+  }
+  #endif
+  #if defined(SERIAL2)
+  if (serial2Mode == UART_MODE_LUA) {
+    size_t wr_len = len;
+    const char* p = str;
+    while(wr_len--) serial2Putc(*p++);
+  }
+  #endif
+#else
+  debugPrintf("luaSerialWrite: %.*s",len,str);
+#endif
+
   return 0;
 }
 
@@ -1318,6 +1356,7 @@ const luaL_Reg opentxLib[] = {
   { "crossfireTelemetryPop", luaCrossfireTelemetryPop },
   { "crossfireTelemetryPush", luaCrossfireTelemetryPush },
 #endif
+  { "serialWrite", luaSerialWrite },
   { NULL, NULL }  /* sentinel */
 };
 

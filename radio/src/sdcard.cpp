@@ -259,11 +259,8 @@ bool sdListFiles(const char * path, const char * extension, const uint8_t maxlen
   uint8_t fnLen, extLen;
   char tmpExt[LEN_FILE_EXTENSION_MAX+1] = "\0";
 
-#if defined(CPUARM)
   popupMenuOffsetType = MENU_OFFSET_EXTERNAL;
-#endif
 
-#if defined(CPUARM)
   static uint8_t s_last_flags;
 
   if (selection) {
@@ -273,7 +270,6 @@ bool sdListFiles(const char * path, const char * extension, const uint8_t maxlen
   else {
     flags = s_last_flags;
   }
-#endif
 
   if (popupMenuOffset == 0) {
     lastpopupMenuOffset = 0;
@@ -437,7 +433,7 @@ FRESULT sdReadDir(DIR * dir, FILINFO * fno, bool & firstTime)
   return res;
 }
 
-#if defined(CPUARM) && defined(SDCARD)
+#if defined(SDCARD)
 const char * sdCopyFile(const char * srcPath, const char * destPath)
 {
   FIL srcFile;
@@ -488,7 +484,7 @@ const char * sdCopyFile(const char * srcFilename, const char * srcDir, const cha
 
   return sdCopyFile(srcPath, destPath);
 }
-#endif // defined(CPUARM) && defined(SDCARD)
+#endif // defined(SDCARD)
 
 
 #if !defined(SIMU) || defined(SIMU_DISKIO)

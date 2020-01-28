@@ -60,7 +60,7 @@ static const QStringList STR_SUBTYPE_Q303    {"Standard", "CX35", "CX10D", "CX10
 static const QStringList STR_SUBTYPE_CABELL  {"Cabell V3", "Cab V3 Telem", "-", "-", "-", "-", "Set FailSafe", "Unbind"};
 static const QStringList STR_SUBTYPE_H83D    {"H8 Mini 3D", "H20H", "H20 Mini", "H30 Mini"};
 static const QStringList STR_SUBTYPE_CORONA  {"V1", "V2", "Flydream V3"};
-static const QStringList STR_SUBTYPE_HITEC   {"Optima", "Optima Hub Telem", "Minima"};
+static const QStringList STR_SUBTYPE_HITEC 	 {"Optima", "Optima Hub Telem", "Minima"};
 static const QStringList STR_SUBTYPE_E01X    {"E012", "E015"};
 
 static const QStringList NO_SUBTYPE          {STR_MULTI_DEFAULT};
@@ -138,7 +138,7 @@ QString Multiprotocols::protocolToString(int protocol, bool custom)
     "FlySky", "Hubsan", "FrSky", "Hisky", "V2x2", "DSM", "Devo", "YD717", "KN", "SymaX", "SLT", "CX10", "CG023",
     "Bayang", "ESky", "MT99XX", "MJXQ", "Shenqi", "FY326", "SFHSS", "J6 PRO","FQ777","Assan","Hontai","Open LRS",
     "FlySky AFHDS2A", "Q2x2", "Walkera", "Q303", "GW008", "DM002", "Cabell", "ESky 150", "H8 3D", "Corona", "CFlie",
-    "Hitec", "Wfly", "Bugs", "Bugs Mini", "Traxxas", "NCC-1701-A", "E01X", "V911S", "GD00X"
+	"Hitec", "Wfly", "Bugs", "Bugs Mini", "Traxxas", "NCC-1701-A", "E01X", "V911S", "GD00X"
   });
 
   if (protocol == MM_RF_CUSTOM_SELECTED || custom)
