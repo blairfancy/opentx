@@ -36,10 +36,9 @@ enum MenuModelFlightModeItems {
   ITEM_MODEL_FLIGHT_MODE_NAME,
   ITEM_MODEL_FLIGHT_MODE_SWITCH,
   ITEM_MODEL_FLIGHT_MODE_TRIMS,
-  IF_ROTARY_ENCODERS(ITEM_MODEL_FLIGHT_MODE_ROTARY_ENCODERS)
   ITEM_MODEL_FLIGHT_MODE_FADE_IN,
   ITEM_MODEL_FLIGHT_MODE_FADE_OUT,
-#if defined(GVARS) && !defined(PCBSTD)
+#if defined(GVARS)
   ITEM_MODEL_FLIGHT_MODE_GVARS_LABEL,
   ITEM_MODEL_FLIGHT_MODE_GV1,
   ITEM_MODEL_FLIGHT_MODE_GV2,
@@ -72,22 +71,22 @@ void menuModelFlightModeOne(event_t event)
   #define VERTICAL_SHIFT  (ITEM_MODEL_FLIGHT_MODE_FADE_IN-ITEM_MODEL_FLIGHT_MODE_SWITCH)
   static const uint8_t mstate_tab_fm1[]  = {0, 0, 0, (uint8_t)-1, 1, 1, 1, 1, 1};
 #endif
-  static const uint8_t mstate_tab_others[]  = {0, 0, 3, IF_ROTARY_ENCODERS(NUM_ROTARY_ENCODERS-1) 0, 0, (uint8_t)-1, 2, 2, 2, 2, 2};
+  static const uint8_t mstate_tab_others[]  = {0, 0, 3, 0, 0, (uint8_t)-1, 2, 2, 2, 2, 2};
 
   check(event, 0, NULL, 0, (s_currIdx == 0) ? mstate_tab_fm1 : mstate_tab_others, DIM(mstate_tab_others)-1, ITEM_MODEL_FLIGHT_MODE_MAX - HEADER_LINE - (s_currIdx==0 ? (ITEM_MODEL_FLIGHT_MODE_FADE_IN-ITEM_MODEL_FLIGHT_MODE_SWITCH-1) : 0));
 
-  TITLE(STR_MENUFLIGHTMODE);
+  title(STR_MENUFLIGHTMODE);
 
   #define PHASE_ONE_FIRST_LINE (1+1*FH)
 #else
-  SUBMENU(STR_MENUFLIGHTMODE, 3 + (s_currIdx==0 ? 0 : 2 + (bool)NUM_ROTARY_ENCODERS), {0, 0, 3, IF_ROTARY_ENCODERS(NUM_ROTARY_ENCODERS-1) 0/*, 0*/});
+  SUBMENU(STR_MENUFLIGHTMODE, 3 + (s_currIdx==0 ? 0 : 2), {0, 0, 3, 0/*, 0*/});
   #define PHASE_ONE_FIRST_LINE (1+1*FH)
 #endif
 
   int8_t sub = menuVerticalPosition;
   int8_t editMode = s_editMode;
 
-#if defined(GVARS) && !defined(PCBSTD)
+#if defined(GVARS)
   if (s_currIdx == 0 && sub>=ITEM_MODEL_FLIGHT_MODE_SWITCH) sub += VERTICAL_SHIFT;
 
   for (uint8_t k=0; k<LCD_LINES-1; k++) {
@@ -114,30 +113,16 @@ void menuModelFlightModeOne(event_t event)
         lcdDrawTextAlignedLeft(y, STR_TRIMS);
         for (uint8_t t = 0; t < NUM_STICKS; t++) {
           drawTrimMode(MIXES_2ND_COLUMN + (t*2*FW), y, s_currIdx, t, menuHorizontalPosition == t ? attr : 0);
+#if defined(NAVIGATION_9X)
+          if (s_editMode > 0 && attr && menuHorizontalPosition == t) {
+#else
           if (s_editMode >= 0 && attr && menuHorizontalPosition == t) {
+#endif
             trim_t & v = fm->trim[t];
             v.mode = checkIncDec(event, v.mode==TRIM_MODE_NONE ? -1 : v.mode, -1, k==0 ? 0 : 2*MAX_FLIGHT_MODES-1, EE_MODEL, isTrimModeAvailable);
           }
         }
         break;
-
-#if ROTARY_ENCODERS > 0
-      case ITEM_MODEL_FLIGHT_MODE_ROTARY_ENCODERS:
-        lcdDrawTextAlignedLeft(y, STR_ROTARY_ENCODER);
-        for (uint8_t t=0; t<NUM_ROTARY_ENCODERS; t++) {
-          putsRotaryEncoderMode(MIXES_2ND_COLUMN+(t*FW), y, s_currIdx, t, menuHorizontalPosition==t ? attr : 0);
-          if (attr && menuHorizontalPosition==t && ((editMode>0) || p1valdiff)) {
-            int16_t v = flightModeAddress(s_currIdx)->rotaryEncoders[t];
-            if (v < ROTARY_ENCODER_MAX) v = ROTARY_ENCODER_MAX;
-            v = checkIncDec(event, v, ROTARY_ENCODER_MAX, ROTARY_ENCODER_MAX+MAX_FLIGHT_MODES-1, EE_MODEL);
-            if (checkIncDec_Ret) {
-              if (v == ROTARY_ENCODER_MAX) v = 0;
-              flightModeAddress(s_currIdx)->rotaryEncoders[t] = v;
-            }
-          }
-        }
-        break;
-#endif
 
       case ITEM_MODEL_FLIGHT_MODE_FADE_IN:
         fm->fadeIn = EDIT_DELAY(0, y, event, attr, STR_FADEIN, fm->fadeIn);
@@ -147,7 +132,7 @@ void menuModelFlightModeOne(event_t event)
         fm->fadeOut = EDIT_DELAY(0, y, event, attr, STR_FADEOUT, fm->fadeOut);
         break;
 
-#if defined(GVARS) && !defined(PCBSTD)
+#if defined(GVARS)
       case ITEM_MODEL_FLIGHT_MODE_GVARS_LABEL:
         lcdDrawTextAlignedLeft(y, STR_GLOBAL_VARS);
         break;
@@ -175,7 +160,7 @@ void menuModelFlightModeOne(event_t event)
         else {
           lcdDrawText(9*FW, y, STR_OWN, posHorz==1 ? attr : 0);
         }
-        if (attr && s_currIdx>0 && posHorz==1 && (editMode>0 || p1valdiff)) {
+        if (attr && s_currIdx>0 && posHorz==1 && editMode > 0) {
           if (v < GVAR_MAX) v = GVAR_MAX;
           v = checkIncDec(event, v, GVAR_MAX, GVAR_MAX+MAX_FLIGHT_MODES-1, EE_MODEL);
           if (checkIncDec_Ret) {
@@ -191,19 +176,7 @@ void menuModelFlightModeOne(event_t event)
   }
 }
 
-#if defined(ROTARY_ENCODERS)
-  #if ROTARY_ENCODERS > 2
-    #define NAME_OFS                   (-4-12)
-    #define SWITCH_OFS                 (-FW/2-2-13)
-    #define TRIMS_OFS                  (-FW/2-4-15)
-    #define ROTARY_ENC_OFS             (0)
-  #else
-    #define NAME_OFS                   (-4)
-    #define SWITCH_OFS                 (-FW/2-2)
-    #define TRIMS_OFS                  (-FW/2-4)
-    #define ROTARY_ENC_OFS             (2)
-  #endif
-#elif defined(PCBTARANIS)
+#if defined(PCBTARANIS)
   #define NAME_POS                     20
   #define SWITCH_POS                   59
   #define TRIMS_POS                    79
@@ -220,7 +193,6 @@ void menuModelFlightModesAll(event_t event)
   int8_t sub = menuVerticalPosition - HEADER_LINE;
 
   switch (event) {
-    CASE_EVT_ROTARY_BREAK
     case EVT_KEY_FIRST(KEY_ENTER):
       if (sub == MAX_FLIGHT_MODES) {
         s_editMode = 0;

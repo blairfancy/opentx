@@ -22,48 +22,27 @@
 #define _MENUS_H_
 
 #include "keys.h"
+#include "common/stdlcd/menus.h"
 
 #if defined(PCBTARANIS)
-typedef int8_t horzpos_t;
 #define NAVIGATION_LINE_BY_LINE        0x40
 #define IS_LINE_SELECTED(sub, k)       ((sub)==(k) && menuHorizontalPosition < 0)
 #else
-typedef uint8_t horzpos_t;
 #define NAVIGATION_LINE_BY_LINE        0
 #define IS_LINE_SELECTED(sub, k)       (false)
 #endif
 
-#if defined(SDCARD)
-typedef uint16_t vertpos_t;
-#else
-typedef uint8_t vertpos_t;
-#endif
-
-typedef void (*MenuHandlerFunc)(event_t event);
-
-extern tmr10ms_t menuEntryTime;
-
-extern vertpos_t menuVerticalPosition;
-extern horzpos_t menuHorizontalPosition;
-extern vertpos_t menuVerticalOffset;
-extern uint8_t menuCalibrationState;
-
-extern MenuHandlerFunc menuHandlers[5];
-extern uint8_t menuVerticalPositions[4];
-extern uint8_t menuLevel;
-extern uint8_t menuEvent;
-
-void chainMenu(MenuHandlerFunc newMenu);
-void pushMenu(MenuHandlerFunc newMenu);
-void popMenu();
-
-inline MenuHandlerFunc lastPopMenu()
+inline bool isRadioMenuDisplayed()
 {
-  return menuHandlers[menuLevel+1];
+  return menuVerticalPositions[0] == 1;
+}
+
+inline bool isModelMenuDisplayed()
+{
+  return menuVerticalPositions[0] == 0;
 }
 
 void onMainViewMenu(const char * result);
-
 void menuFirstCalib(event_t event);
 void menuMainView(event_t event);
 void menuViewTelemetryFrsky(event_t event);
@@ -71,15 +50,15 @@ void menuSpecialFunctions(event_t event, CustomFunctionData * functions, CustomF
 
 enum MenuRadioIndexes
 {
-  MENU_RADIO_SETUP,
+#if defined(LUA) || defined(PXX2) || defined(MULTIMODULE)
+  MENU_RADIO_TOOLS,
+#endif
   CASE_SDCARD(MENU_RADIO_SD_MANAGER)
+  MENU_RADIO_SETUP,
   MENU_RADIO_SPECIAL_FUNCTIONS,
   MENU_RADIO_TRAINER,
-  MENU_RADIO_VERSION,
-  MENU_RADIO_SWITCHES_TEST,
-  MENU_RADIO_ANALOGS_TEST,
   MENU_RADIO_HARDWARE,
-  MENU_RADIO_CALIBRATION,
+  MENU_RADIO_VERSION,
   MENU_RADIO_PAGES_COUNT
 };
 
@@ -91,18 +70,21 @@ void menuRadioVersion(event_t event);
 void menuRadioDiagKeys(event_t event);
 void menuRadioDiagAnalogs(event_t event);
 void menuRadioHardware(event_t event);
+void menuRadioTools(event_t event);
+void menuRadioSpectrumAnalyser(event_t event);
+void menuRadioPowerMeter(event_t event);
 void menuRadioCalibration(event_t event);
 
-static const MenuHandlerFunc menuTabGeneral[]  = {
-  menuRadioSetup,
+static const MenuHandlerFunc menuTabGeneral[MENU_RADIO_PAGES_COUNT]  = {
+#if defined(LUA) || defined(PXX2) || defined(MULTIMODULE)
+  menuRadioTools,
+#endif
   CASE_SDCARD(menuRadioSdManager)
+  menuRadioSetup,
   menuRadioSpecialFunctions,
   menuRadioTrainer,
-  menuRadioVersion,
-  menuRadioDiagKeys,
-  menuRadioDiagAnalogs,
   menuRadioHardware,
-  menuRadioCalibration
+  menuRadioVersion
 };
 
 enum MenuModelIndexes {
@@ -119,13 +101,16 @@ enum MenuModelIndexes {
 #if defined(LUA_MODEL_SCRIPTS)
   MENU_MODEL_CUSTOM_SCRIPTS,
 #endif
-  CASE_FRSKY(MENU_MODEL_TELEMETRY_FRSKY)
+  MENU_MODEL_TELEMETRY,
   MENU_MODEL_DISPLAY,
   MENU_MODEL_PAGES_COUNT
 };
 
 void menuModelSelect(event_t event);
 void menuModelSetup(event_t event);
+void menuModelFailsafe(event_t event);
+void menuModelModuleOptions(event_t event);
+void menuModelReceiverOptions(event_t event);
 void menuModelHeli(event_t event);
 void menuModelFlightModesAll(event_t event);
 void menuModelExpoOne(event_t event);
@@ -139,7 +124,8 @@ void menuModelGVars(event_t event);
 void menuModelLogicalSwitches(event_t event);
 void menuModelSpecialFunctions(event_t event);
 void menuModelCustomScripts(event_t event);
-void menuModelTelemetryFrsky(event_t event);
+void menuModelTelemetry(event_t event);
+void menuModelSensor(event_t event);
 void menuModelDisplay(event_t event);
 void menuModelTemplates(event_t event);
 void menuModelGVarOne(event_t event);
@@ -158,7 +144,7 @@ static const MenuHandlerFunc menuTabModel[]  = {
 #if defined(LUA_MODEL_SCRIPTS)
   menuModelCustomScripts,
 #endif
-  CASE_FRSKY(menuModelTelemetryFrsky)
+  menuModelTelemetry,
   menuModelDisplay,
 };
 

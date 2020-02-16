@@ -22,6 +22,7 @@
 #include <string.h>
 #include "opentx.h"
 #include "timers.h"
+#include "conversions/conversions.h"
 
 uint8_t   s_write_err = 0;    // error reasons
 RlcFile   theFile;  //used for any file operation
@@ -282,15 +283,17 @@ uint16_t RlcFile::readRlc(uint8_t *buf, uint16_t i_len)
     memclear(&buf[i], ln);
     i        += ln;
     m_zeroes -= ln;
-    if (m_zeroes) break;
+    if (m_zeroes)
+      break;
 
     ln = min<uint16_t>(m_bRlc, i_len-i);
     uint8_t lr = read(&buf[i], ln);
     i        += lr ;
     m_bRlc   -= lr;
-    if(m_bRlc) break;
+    if (m_bRlc) break;
 
-    if (read(&m_bRlc, 1) !=1) break; // read how many bytes to read
+    if (read(&m_bRlc, 1) != 1)
+      break; // read how many bytes to read
 
     assert(m_bRlc & 0x7f);
 
@@ -298,7 +301,7 @@ uint16_t RlcFile::readRlc(uint8_t *buf, uint16_t i_len)
       m_zeroes  =(m_bRlc>>4) & 0x7;
       m_bRlc    = m_bRlc & 0x0f;
     }
-    else if(m_bRlc&0x40) {
+    else if (m_bRlc&0x40) {
       m_zeroes  = m_bRlc & 0x3f;
       m_bRlc    = 0;
     }
@@ -467,7 +470,7 @@ const char * eeBackupModel(uint8_t i_fileSrc)
       len = i+1;
     if (len) {
       if (buf[i])
-        buf[i] = idx2char(buf[i]);
+        buf[i] = zchar2char(buf[i]);
       else
         buf[i] = '_';
     }
@@ -554,7 +557,7 @@ const char * eeRestoreModel(uint8_t i_fileDst, char *model_name)
   }
 
   uint8_t version = (uint8_t)buf[4];
-  if ((*(uint32_t*)&buf[0] != OTX_FOURCC && *(uint32_t*)&buf[0] != O9X_FOURCC) || version < FIRST_CONV_EEPROM_VER || version > EEPROM_VER || buf[5] != 'M') {
+  if (*(uint32_t*)&buf[0] != OTX_FOURCC || version < FIRST_CONV_EEPROM_VER || version > EEPROM_VER || buf[5] != 'M') {
     f_close(&g_oLogFile);
     return STR_INCOMPATIBLE;
   }
@@ -596,7 +599,7 @@ const char * eeRestoreModel(uint8_t i_fileDst, char *model_name)
 #if defined(EEPROM_CONVERSIONS)
   if (version < EEPROM_VER) {
     storageCheck(true);
-    ConvertModel(i_fileDst, version);
+    eeConvertModel(i_fileDst, version);
     eeLoadModel(g_eeGeneral.currModel);
   }
 #endif
@@ -615,9 +618,6 @@ void RlcFile::writeRlc(uint8_t i_fileId, uint8_t typ, uint8_t *buf, uint16_t i_l
   m_rlc_buf = buf;
   m_rlc_len = i_len;
   m_cur_rlc_len = 0;
-#if defined (EEPROM_PROGRESS_BAR)
-  m_ratio = (typ == FILE_TYP_MODEL ? 100 : 10);
-#endif
 
   do {
     nextRlcWriteStep();
@@ -729,7 +729,7 @@ void RlcFile::nextRlcWriteStep()
 void RlcFile::flush()
 {
   while (!eepromIsTransferComplete())
-    wdt_reset();
+    WDG_RESET();
 
   ENABLE_SYNC_WRITE(true);
 
@@ -741,17 +741,6 @@ void RlcFile::flush()
 
   ENABLE_SYNC_WRITE(false);
 }
-
-#if defined (EEPROM_PROGRESS_BAR)
-void RlcFile::drawProgressBar(uint8_t x)
-{
-  if (storageDirtyMsk || isWriting() || eeprom_buffer_size) {
-    uint8_t len = storageDirtyMsk ? 1 : limit((uint8_t)1, (uint8_t)(7 - (m_rlc_len/m_ratio)), (uint8_t)7);
-    lcdDrawFilledRect(x+1, 0, 5, FH, SOLID, ERASE);
-    lcdDrawFilledRect(x+2, 7-len, 3, len);
-  }
-}
-#endif
 
 // For conversions ...
 uint16_t eeLoadGeneralSettingsData()
@@ -768,7 +757,7 @@ uint16_t eeLoadModelData(uint8_t index)
   return theFile.readRlc((uint8_t*)&g_model, sizeof(g_model));
 }
 
-bool eeLoadGeneral()
+bool eeLoadGeneral(bool allowFixes)
 {
   theFile.openRlc(FILE_GENERAL);
   if (theFile.readRlc((uint8_t*)&g_eeGeneral, 3) == 3 && g_eeGeneral.version == EEPROM_VER) {
@@ -787,18 +776,41 @@ bool eeLoadGeneral()
   }
 #endif
 
-#if defined(PCBTARANIS)
+#if defined(PCBX9LITES)
+  if (g_eeGeneral.variant == 0x0800) {
+    TRACE("Pre release EEPROM detected, variant %d instead of %d for X9LiteS radio. Loading anyway", g_eeGeneral.variant, EEPROM_VARIANT);
+    g_eeGeneral.variant = EEPROM_VARIANT;
+    storageDirty(EE_GENERAL);
+    return true;
+  }
+#endif
+
+#if defined(RADIO_T12)
+  if (g_eeGeneral.variant != (EEPROM_VARIANT & 0xFFFE)) {
+    TRACE("EEPROM variant %d instead of %d", g_eeGeneral.variant, EEPROM_VARIANT);
+    return false;
+  }
+  else if (g_eeGeneral.variant != EEPROM_VARIANT && g_eeGeneral.version ==  218) {
+    TRACE("V218 T12/X7 detected, allowing use", g_eeGeneral.variant, EEPROM_VARIANT); // Production firmware use v218 X7 variant
+  }
+  else {
+    TRACE("EEPROM variant %d instead of %d", g_eeGeneral.variant, EEPROM_VARIANT);
+    return false;
+  }
+#elif defined(PCBTARANIS)
   if (g_eeGeneral.variant != EEPROM_VARIANT) {
     TRACE("EEPROM variant %d instead of %d", g_eeGeneral.variant, EEPROM_VARIANT);
     return false;
   }
 #endif
+
 #if defined(EEPROM_CONVERSIONS)
   if (g_eeGeneral.version != EEPROM_VER) {
     TRACE("EEPROM version %d instead of %d", g_eeGeneral.version, EEPROM_VER);
-    if (!eeConvert()) {
+    if (!allowFixes)
+      return false; // prevent eeprom from being wiped
+    if (!eeConvert())
       return false;
-    }
   }
   return true;
 #else
@@ -880,7 +892,7 @@ void eeDeleteModel(uint8_t idx)
 #if defined(SDCARD)
 void eepromBackup()
 {
-  char filename[60];
+  char path[60];
   uint8_t buffer[1024];
   FIL file;
 
@@ -897,20 +909,20 @@ void eepromBackup()
   }
 
   // prepare the filename...
-  char * tmp = strAppend(filename, EEPROMS_PATH "/eeprom");
+  char * tmp = strAppend(path, EEPROMS_PATH "/eeprom");
 #if defined(RTCLOCK)
   tmp = strAppendDate(tmp, true);
 #endif
   strAppend(tmp, EEPROM_EXT);
 
   // open the file for writing...
-  f_open(&file, filename, FA_WRITE | FA_CREATE_ALWAYS);
+  f_open(&file, path, FA_WRITE | FA_CREATE_ALWAYS);
 
   for (int i=0; i<EEPROM_SIZE; i+=1024) {
     UINT count;
     eepromReadBlock(buffer, i, 1024);
     f_write(&file, buffer, 1024, &count);
-    drawProgressBar(STR_WRITING, i, EEPROM_SIZE);
+    drawProgressScreen("EEPROM Backup", STR_WRITING, i, EEPROM_SIZE);
 #if defined(SIMU)
     // add an artificial delay and check for simu quit
     if (SIMU_SLEEP_OR_EXIT_MS(100))

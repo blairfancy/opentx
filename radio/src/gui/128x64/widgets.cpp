@@ -70,11 +70,11 @@ void title(const char * s)
   lcdDrawText(0, 0, s, INVERS);
 }
 
-choice_t editChoice(coord_t x, coord_t y, const char * label, const char *values, choice_t value, choice_t min, choice_t max, LcdFlags attr, event_t event)
+choice_t editChoice(coord_t x, coord_t y, const char * label, const char *values, choice_t value, choice_t min, choice_t max, LcdFlags attr, event_t event, IsValueAvailable isValueAvailable)
 {
   drawFieldLabel(x, y, label);
   if (values) lcdDrawTextAtIndex(x, y, values, value-min, attr);
-  if (attr & (~RIGHT)) value = checkIncDec(event, value, min, max, (menuVerticalPositions[0] == 0) ? EE_MODEL : EE_GENERAL);
+  if (attr & (~RIGHT)) value = checkIncDec(event, value, min, max, (isModelMenuDisplayed()) ? EE_MODEL : EE_GENERAL, isValueAvailable);
   return value;
 }
 
@@ -88,7 +88,7 @@ uint8_t editCheckBox(uint8_t value, coord_t x, coord_t y, const char *label, Lcd
 #endif
 }
 
-int8_t editSwitch(coord_t x, coord_t y, int8_t value, LcdFlags attr, event_t event)
+swsrc_t editSwitch(coord_t x, coord_t y, swsrc_t value, LcdFlags attr, event_t event)
 {
   drawFieldLabel(x, y, STR_SWITCH);
   drawSwitch(x,  y, value, attr);
@@ -96,13 +96,19 @@ int8_t editSwitch(coord_t x, coord_t y, int8_t value, LcdFlags attr, event_t eve
   return value;
 }
 
-void drawSlider(coord_t x, coord_t y, uint8_t value, uint8_t max, uint8_t attr)
+void drawSlider(coord_t x, coord_t y, uint8_t width, uint8_t value, uint8_t max, uint8_t attr)
 {
-  lcdDrawChar(x+(value*4*FW)/max, y, '$');
-  lcdDrawSolidHorizontalLine(x, y+3, 5*FW-1, FORCE);
-  if (attr && (!(attr & BLINK) || !BLINK_ON_PHASE)) lcdDrawSolidFilledRect(x, y, 5*FW-1, FH-1);
+  lcdDrawChar(x + (value * (width - FWNUM)) / max, y, '$');
+  lcdDrawSolidHorizontalLine(x, y + 3, width, FORCE);
+  if (attr && (!(attr & BLINK) || !BLINK_ON_PHASE)) {
+    lcdDrawSolidFilledRect(x, y, width, FH - 1);
+  }
 }
 
+void drawSlider(coord_t x, coord_t y, uint8_t value, uint8_t max, uint8_t attr)
+{
+  drawSlider(x, y, 5*FW - 1, value, max, attr);
+}
 
 #if defined(GVARS)
 void drawGVarValue(coord_t x, coord_t y, uint8_t gvar, gvar_t value, LcdFlags flags)
@@ -224,38 +230,8 @@ void drawStatusLine()
     }
 
     lcdDrawFilledRect(0, LCD_H-statusLineHeight, LCD_W, FH, SOLID, ERASE);
-    lcdDrawText(5, LCD_H+1-statusLineHeight, statusLineMsg, BSS);
+    lcdDrawText(5, LCD_H+1-statusLineHeight, statusLineMsg);
     lcdDrawFilledRect(0, LCD_H-statusLineHeight, LCD_W, FH, SOLID);
   }
 }
 #endif
-
-void drawProgressBar(const char * label, int num, int den)
-{
-  lcdClear();
-  if (label) {
-    lcdDrawTextAlignedLeft(4*FH, label);
-  }
-  lcdDrawRect(4, 6*FH+4, LCD_W-8, 7);
-  if (num > 0 && den > 0) {
-    int width = ((LCD_W-12)*num)/den;
-    lcdDrawSolidHorizontalLine(6, 6*FH+6, width, FORCE);
-    lcdDrawSolidHorizontalLine(6, 6*FH+7, width, FORCE);
-    lcdDrawSolidHorizontalLine(6, 6*FH+8, width, FORCE);
-  }
-  lcdRefresh();
-}
-
-const unsigned char SLEEP_BITMAP[]  = {
-#include "sleep.lbm"
-};
-
-#define SLEEP_BITMAP_WIDTH             60
-#define SLEEP_BITMAP_HEIGHT            60
-
-void drawSleepBitmap()
-{
-  lcdClear();
-  lcdDraw1bitBitmap((LCD_W-SLEEP_BITMAP_WIDTH)/2, (LCD_H-SLEEP_BITMAP_HEIGHT)/2, SLEEP_BITMAP, 0);
-  lcdRefresh();
-}

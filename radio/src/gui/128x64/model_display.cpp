@@ -52,36 +52,58 @@ enum MenuModelDisplayItems {
 #endif
 #define DISPLAY_COL3                  (17*FW+2)
 
-#if defined(LUA)
-  #define SCREEN_TYPE_ROWS            1
-  #define DISPLAY_LINE_ROWS(x)        ((TELEMETRY_SCREEN_TYPE(x) == TELEMETRY_SCREEN_TYPE_NONE || TELEMETRY_SCREEN_TYPE(x) == TELEMETRY_SCREEN_TYPE_SCRIPT) ? HIDDEN_ROW : (TELEMETRY_SCREEN_TYPE(x) == TELEMETRY_SCREEN_TYPE_GAUGES ? (uint8_t)2 : (uint8_t)1))
-#else
-  #define SCREEN_TYPE_ROWS            0
-  #define DISPLAY_LINE_ROWS(x)        (TELEMETRY_SCREEN_TYPE(x) == TELEMETRY_SCREEN_TYPE_NONE ? HIDDEN_ROW : (TELEMETRY_SCREEN_TYPE(x) == TELEMETRY_SCREEN_TYPE_GAUGES ? (uint8_t)2 : (uint8_t)1))
-#endif
-
-#define TELEMETRY_SCREEN_ROWS(x)      SCREEN_TYPE_ROWS, DISPLAY_LINE_ROWS(x), DISPLAY_LINE_ROWS(x), DISPLAY_LINE_ROWS(x), DISPLAY_LINE_ROWS(x)
-#define TELEMETRY_CURRENT_SCREEN(k)   (k < ITEM_DISPLAY_SCREEN_LABEL2 ? 0 : (k < ITEM_DISPLAY_SCREEN_LABEL3 ? 1 : (k < ITEM_DISPLAY_SCREEN_LABEL4 ? 2 : 3)))
-
-#if defined(LUA)
-void onTelemetryScriptFileSelectionMenu(const char *result)
+inline uint8_t SCREEN_TYPE_COLUMNS(uint8_t screenIndex)
 {
-  int screenIndex = TELEMETRY_CURRENT_SCREEN(menuVerticalPosition - HEADER_LINE);
+  if (TELEMETRY_SCREEN_TYPE(screenIndex) == TELEMETRY_SCREEN_TYPE_SCRIPT)
+    return 1;
+  else
+    return 0;
+}
+
+inline uint8_t SCREEN_LINE_COLUMNS(uint8_t screenIndex, uint8_t lineIndex)
+{
+  switch (TELEMETRY_SCREEN_TYPE(screenIndex)) {
+    case TELEMETRY_SCREEN_TYPE_VALUES:
+      return 1;
+    case TELEMETRY_SCREEN_TYPE_BARS:
+      return g_model.screens[screenIndex].bars[lineIndex].source ? 2 : 0;
+    default:
+      return HIDDEN_ROW;
+  }
+}
+
+#define TELEMETRY_SCREEN_ROWS(x)      SCREEN_TYPE_COLUMNS(x), SCREEN_LINE_COLUMNS(x, 0), SCREEN_LINE_COLUMNS(x, 1), SCREEN_LINE_COLUMNS(x, 2), SCREEN_LINE_COLUMNS(x, 3)
+
+inline uint8_t DISPLAY_CURRENT_SCREEN(uint8_t line)
+{
+  if (line < ITEM_DISPLAY_SCREEN_LABEL2)
+    return 0;
+  else if (line < ITEM_DISPLAY_SCREEN_LABEL3)
+    return 1;
+  else if (line < ITEM_DISPLAY_SCREEN_LABEL4)
+    return 2;
+  else
+    return 3;
+}
+
+#if defined(LUA)
+void onTelemetryScriptFileSelectionMenu(const char * result)
+{
+  int screenIndex = DISPLAY_CURRENT_SCREEN(menuVerticalPosition - HEADER_LINE);
 
   if (result == STR_UPDATE_LIST) {
-    if (!sdListFiles(SCRIPTS_TELEM_PATH, SCRIPTS_EXT, sizeof(g_model.frsky.screens[screenIndex].script.file), NULL)) {
+    if (!sdListFiles(SCRIPTS_TELEM_PATH, SCRIPTS_EXT, sizeof(g_model.screens[screenIndex].script.file), NULL)) {
       POPUP_WARNING(STR_NO_SCRIPTS_ON_SD);
     }
   }
-  else {
+  else if (result != STR_EXIT) {
     // The user choosed a file in the list
-    memcpy(g_model.frsky.screens[screenIndex].script.file, result, sizeof(g_model.frsky.screens[screenIndex].script.file));
+    memcpy(g_model.screens[screenIndex].script.file, result, sizeof(g_model.screens[screenIndex].script.file));
     storageDirty(EE_MODEL);
     LUA_LOAD_MODEL_SCRIPTS();
   }
 }
 #endif
-
 
 int skipHiddenLines(int noRows, const uint8_t * mstate_tab, int row)
 {
@@ -120,17 +142,17 @@ void menuModelDisplay(event_t event)
       case ITEM_DISPLAY_SCREEN_LABEL3:
       case ITEM_DISPLAY_SCREEN_LABEL4:
       {
-        uint8_t screenIndex = TELEMETRY_CURRENT_SCREEN(k);
+        uint8_t screenIndex = DISPLAY_CURRENT_SCREEN(k);
         drawStringWithIndex(0*FW, y, STR_SCREEN, screenIndex+1);
         TelemetryScreenType oldScreenType = TELEMETRY_SCREEN_TYPE(screenIndex);
         TelemetryScreenType newScreenType = (TelemetryScreenType)editChoice(DISPLAY_COL2, y, "", STR_VTELEMSCREENTYPE, oldScreenType, 0, TELEMETRY_SCREEN_TYPE_MAX, (menuHorizontalPosition==0 ? attr : 0), event);
         if (newScreenType != oldScreenType) {
-          g_model.frsky.screensType = (g_model.frsky.screensType & (~(0x03 << (2*screenIndex)))) | (newScreenType << (2*screenIndex));
-          memset(&g_model.frsky.screens[screenIndex], 0, sizeof(g_model.frsky.screens[screenIndex]));
+          g_model.screensType = (g_model.screensType & (~(0x03 << (2*screenIndex)))) | (newScreenType << (2*screenIndex));
+          memset(&g_model.screens[screenIndex], 0, sizeof(g_model.screens[screenIndex]));
         }
 #if defined(LUA)
         if (newScreenType == TELEMETRY_SCREEN_TYPE_SCRIPT) {
-          TelemetryScriptData & scriptData = g_model.frsky.screens[screenIndex].script;
+          TelemetryScriptData & scriptData = g_model.screens[screenIndex].script;
 
           // TODO better function name for ---
           // TODO function for these lines
@@ -141,16 +163,13 @@ void menuModelDisplay(event_t event)
 
           if (menuHorizontalPosition==1 && attr && event==EVT_KEY_BREAK(KEY_ENTER) && READ_ONLY_UNLOCKED()) {
             s_editMode = 0;
-            if (sdListFiles(SCRIPTS_TELEM_PATH, SCRIPTS_EXT, sizeof(g_model.frsky.screens[screenIndex].script.file), g_model.frsky.screens[screenIndex].script.file)) {
+            if (sdListFiles(SCRIPTS_TELEM_PATH, SCRIPTS_EXT, sizeof(g_model.screens[screenIndex].script.file), g_model.screens[screenIndex].script.file)) {
               POPUP_MENU_START(onTelemetryScriptFileSelectionMenu);
             }
             else {
               POPUP_WARNING(STR_NO_SCRIPTS_ON_SD);
             }
           }
-        }
-        else if (attr) {
-          MOVE_CURSOR_FROM_HERE();
         }
 #endif
         break;
@@ -192,7 +211,7 @@ void menuModelDisplay(event_t event)
         }
 
         if (IS_BARS_SCREEN(screenIndex)) {
-          FrSkyBarData & bar = g_model.frsky.screens[screenIndex].bars[lineIndex];
+          FrSkyBarData & bar = g_model.screens[screenIndex].bars[lineIndex];
           drawSource(DISPLAY_COL1, y, bar.source, menuHorizontalPosition==0 ? attr : 0);
           int16_t barMax, barMin;
           LcdFlags lf = LEFT;
@@ -206,9 +225,6 @@ void menuModelDisplay(event_t event)
               drawSourceCustomValue(DISPLAY_COL2, y, bar.source, bar.barMin, (menuHorizontalPosition==1 ? attr : 0) | lf);
               drawSourceCustomValue(DISPLAY_COL3, y, bar.source, bar.barMax, (menuHorizontalPosition==2 ? attr : 0) | lf);
             }
-          }
-          else if (attr) {
-            MOVE_CURSOR_FROM_HERE();
           }
           if (attr && s_editMode>0) {
             switch (menuHorizontalPosition) {
@@ -237,11 +253,11 @@ void menuModelDisplay(event_t event)
         else {
           for (int c=0; c<NUM_LINE_ITEMS; c++) {
             LcdFlags cellAttr = (menuHorizontalPosition==c ? attr : 0);
-            source_t & value = g_model.frsky.screens[screenIndex].lines[lineIndex].sources[c];
+            source_t * value = &g_model.screens[screenIndex].lines[lineIndex].sources[c];
             const coord_t pos[] = {DISPLAY_COL1, DISPLAY_COL2, DISPLAY_COL3};
-            drawSource(pos[c], y, value, cellAttr);
+            drawSource(pos[c], y, *value, cellAttr);
             if (cellAttr && s_editMode>0) {
-              value = checkIncDec(event, value, 0, MIXSRC_LAST_TELEM, EE_MODEL|INCDEC_SOURCE|NO_INCDEC_MARKS, isSourceAvailable);
+              *value = checkIncDec(event, *value, 0, MIXSRC_LAST_TELEM, EE_MODEL|INCDEC_SOURCE|NO_INCDEC_MARKS, isSourceAvailable);
             }
           }
           if (attr && menuHorizontalPosition == NUM_LINE_ITEMS) {

@@ -20,73 +20,11 @@
 
 #include "opentx.h"
 
-/*
- * Rotary encoder handling based on state table:
- * Copyright (C) by Ben Buxton
- * 
- * This includes the state table definition bellow
- * as well as the implementation of checkRotaryEncoder().
- * 
- * The below state table has, for each state (row), the new state
- * to set based on the next encoder output. From left to right in,
- * the table, the encoder outputs are 00, 01, 10, 11, and the value
- * in that position is the new state to set.
- */
-
-#define R_START 0x0
-#define DIR_CW  0x10
-#define DIR_CCW 0x20
-
-// Use the half-step state table (emits a code at 00 and 11)
-#define R_CCW_BEGIN 0x1
-#define R_CW_BEGIN 0x2
-#define R_START_M 0x3
-#define R_CW_BEGIN_M 0x4
-#define R_CCW_BEGIN_M 0x5
-const unsigned char rotenc_table[6][4] = {
-  // R_START (00)
-  {R_START_M,            R_CW_BEGIN,     R_CCW_BEGIN,  R_START},
-  // R_CCW_BEGIN
-  {R_START_M | DIR_CCW, R_START,        R_CCW_BEGIN,  R_START},
-  // R_CW_BEGIN
-  {R_START_M | DIR_CW,  R_CW_BEGIN,     R_START,      R_START},
-  // R_START_M (11)
-  {R_START_M,            R_CCW_BEGIN_M,  R_CW_BEGIN_M, R_START},
-  // R_CW_BEGIN_M
-  {R_START_M,            R_START_M,      R_CW_BEGIN_M, R_START | DIR_CW},
-  // R_CCW_BEGIN_M
-  {R_START_M,            R_CCW_BEGIN_M,  R_START_M,    R_START | DIR_CCW},
-};
-
-void checkRotaryEncoder()
-{
-  static uint8_t  state = 0;
-  uint32_t pins = ROTARY_ENCODER_POSITION();
-  
-  state = rotenc_table[state & 0x0F][pins];
-  if ((state & 0x30) && !keyState(KEY_ENTER)) {
-    if ((state & 0x30) == DIR_CW) {
-      --rotencValue[0];
-    }
-    else {
-      ++rotencValue[0];
-    }
-#if !defined(BOOT)
-    if (g_eeGeneral.backlightMode & e_backlight_mode_keys)
-      backlightOn();
-#endif
-  }
-}
-
-/*
- * End of the rotary encoder handler code
- */
-
 uint32_t readKeys()
 {
   uint32_t result = 0;
 
-#if defined(PCBX12S)
+#if defined(KEYS_GPIO_REG_PGUP)
   if (~KEYS_GPIO_REG_PGUP & KEYS_GPIO_PIN_PGUP)
     result |= 1 << KEY_PGUP;
 #endif
@@ -141,9 +79,9 @@ uint32_t readTrims()
   return result;
 }
 
-uint16_t trimDown(uint16_t idx)
+bool trimDown(uint8_t idx)
 {
-  return readTrims() & (1 << idx);
+  return readTrims() & ((uint32_t)1 << idx);
 }
 
 bool keyDown()
@@ -220,11 +158,6 @@ void readKeysAndTrims()
     } \
     break
 
-uint8_t keyState(uint8_t index)
-{
-  return keys[index].state();
-}
-
 #if !defined(BOOT)
 uint32_t switchState(uint8_t index)
 {
@@ -240,6 +173,8 @@ uint32_t switchState(uint8_t index)
     ADD_INV_2POS_CASE(F);
     ADD_3POS_CASE(G, 6);
     ADD_2POS_CASE(H);
+    ADD_2POS_CASE(I);
+    ADD_2POS_CASE(J);
 #else
     ADD_3POS_CASE(A, 0);
     ADD_INV_3POS_CASE(B, 1);
@@ -249,6 +184,8 @@ uint32_t switchState(uint8_t index)
     ADD_2POS_CASE(F);
     ADD_3POS_CASE(G, 6);
     ADD_2POS_CASE(H);
+    ADD_2POS_CASE(I);
+    ADD_2POS_CASE(J);
 #endif
     default:
       break;
@@ -262,32 +199,21 @@ uint32_t switchState(uint8_t index)
 void keysInit()
 {
   GPIO_InitTypeDef GPIO_InitStructure;
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
   GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
   GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
-  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP ;
+  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
+  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
 
-  GPIO_InitStructure.GPIO_Pin = KEYS_GPIOB_PINS;
-  GPIO_Init(GPIOB, &GPIO_InitStructure);
+  INIT_KEYS_PINS(GPIOB);
 
-  GPIO_InitStructure.GPIO_Pin = KEYS_GPIOC_PINS;
-  GPIO_Init(GPIOC, &GPIO_InitStructure);
+#if defined(KEYS_GPIOC_PINS)
+  INIT_KEYS_PINS(GPIOC);
+#endif
 
-  GPIO_InitStructure.GPIO_Pin = KEYS_GPIOD_PINS;
-  GPIO_Init(GPIOD, &GPIO_InitStructure);
-
-  GPIO_InitStructure.GPIO_Pin = KEYS_GPIOE_PINS;
-  GPIO_Init(GPIOE, &GPIO_InitStructure);
-
-  GPIO_InitStructure.GPIO_Pin = KEYS_GPIOG_PINS;
-  GPIO_Init(GPIOG, &GPIO_InitStructure);
-
-  GPIO_InitStructure.GPIO_Pin = KEYS_GPIOH_PINS;
-  GPIO_Init(GPIOH, &GPIO_InitStructure);
-
-  GPIO_InitStructure.GPIO_Pin = KEYS_GPIOI_PINS;
-  GPIO_Init(GPIOI, &GPIO_InitStructure);
-
-  GPIO_InitStructure.GPIO_Pin = KEYS_GPIOJ_PINS;
-  GPIO_Init(GPIOJ, &GPIO_InitStructure);
+  INIT_KEYS_PINS(GPIOD);
+  INIT_KEYS_PINS(GPIOE);
+  INIT_KEYS_PINS(GPIOG);
+  INIT_KEYS_PINS(GPIOH);
+  INIT_KEYS_PINS(GPIOI);
+  INIT_KEYS_PINS(GPIOJ);
 }

@@ -24,9 +24,11 @@
 #include "gui_common.h"
 #include "lcd.h"
 #include "menus.h"
-#include "widgets.h"
+#include "draw_functions.h"
 #include "bitmaps.h"
 #include "theme.h"
+
+#define HEADER_LINE                    0
 
 #define MENU_TOOLTIPS
 #define MENU_HEADER_HEIGHT             45
@@ -62,7 +64,6 @@
 #define DATETIME_MIDDLE                (LCD_W+DATETIME_SEPARATOR_X+4)/2
 
 #define MENU_TITLE_NEXT_POS            (lcdNextPos + 10)
-#define MENU_INIT_VPOS                 -1
 
 #if defined(HELI) && defined(GVARS) && defined(LUA_MODEL_SCRIPTS)
 #define MENU_ICONS_SPACING             31
@@ -88,6 +89,7 @@ void drawCurveVerticalScale(int x);
 void drawCurveHorizontalScale();
 void drawCurveCoord(int x, int y, const char * text, bool active=false);
 void drawCurvePoint(int x, int y, LcdFlags color);
+void drawPower(coord_t x, coord_t y, int8_t dBm, LcdFlags att = 0);
 
 extern Layout * customScreens[MAX_CUSTOM_SCREENS];
 extern Topbar * topbar;

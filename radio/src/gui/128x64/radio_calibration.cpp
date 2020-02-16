@@ -23,14 +23,6 @@
 #define XPOT_DELTA 10
 #define XPOT_DELAY 10 /* cycles */
 
-enum CalibrationState {
-  CALIB_START = 0,
-  CALIB_SET_MIDPOINT,
-  CALIB_MOVE_STICKS,
-  CALIB_STORE,
-  CALIB_FINISHED
-};
-
 void menuCommonCalib(event_t event)
 {
   for (uint8_t i=0; i<NUM_STICKS+NUM_POTS+NUM_SLIDERS; i++) { // get low and high vals for sticks and trims
@@ -172,8 +164,8 @@ void menuCommonCalib(event_t event)
 
 void menuRadioCalibration(event_t event)
 {
-  check_simple(event, MENU_RADIO_CALIBRATION, menuTabGeneral, DIM(menuTabGeneral), 0);
-  TITLE(STR_MENUCALIBRATION);
+  check_submenu_simple(event, 0);
+  title(STR_MENUCALIBRATION);
   menuCommonCalib(READ_ONLY() ? 0 : event);
   if (menuEvent) {
     menuCalibrationState = CALIB_START;
@@ -187,7 +179,7 @@ void menuFirstCalib(event_t event)
     chainMenu(menuMainView);
   }
   else {
-    lcdDrawTextAlignedCenter(0*FH, MENUCALIBRATION);
+    lcdDrawTextAlignedCenter(0*FH, TR_MENUCALIBRATION);
     lcdInvertLine(0);
     menuCommonCalib(event);
   }
