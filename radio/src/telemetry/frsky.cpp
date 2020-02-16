@@ -22,24 +22,30 @@
 
 void processFrskyTelemetryData(uint8_t data)
 {
-  static uint8_t dataState = STATE_DATA_IDLE;
-
 #if defined(PCBSKY9X) && defined(BLUETOOTH)
   // TODO if (g_model.bt_telemetry)
   btPushByte(data);
 #endif
 
-#if defined(SERIAL2)
-  if (g_eeGeneral.serial2Mode == UART_MODE_TELEMETRY_MIRROR) {
-    serial2Putc(data);
+#if defined(AUX_SERIAL)
+  if (g_eeGeneral.auxSerialMode == UART_MODE_TELEMETRY_MIRROR) {
+    auxSerialPutc(data);
   }
 #endif
 
-#if defined(BLUETOOTH)
-  if (g_eeGeneral.bluetoothMode == BLUETOOTH_TELEMETRY && bluetoothState == BLUETOOTH_STATE_CONNECTED) {
-    bluetoothForwardTelemetry(data);
+  if (pushFrskyTelemetryData(data)) {
+    if (IS_FRSKY_SPORT_PROTOCOL()) {
+      sportProcessTelemetryPacket(telemetryRxBuffer);
+    }
+    else {
+      frskyDProcessPacket(telemetryRxBuffer);
+    }
   }
-#endif
+}
+
+bool pushFrskyTelemetryData(uint8_t data)
+{
+  static uint8_t dataState = STATE_DATA_IDLE;
 
   switch (dataState) {
     case STATE_DATA_START:
@@ -58,7 +64,7 @@ void processFrskyTelemetryData(uint8_t data)
       break;
 
     case STATE_DATA_IN_FRAME:
-      if (data == BYTESTUFF) {
+      if (data == BYTE_STUFF) {
         dataState = STATE_DATA_XOR; // XOR next byte
       }
       else if (data == START_STOP) {
@@ -68,8 +74,8 @@ void processFrskyTelemetryData(uint8_t data)
         }
         else {
           // end of frame detected
-          frskyDProcessPacket(telemetryRxBuffer);
           dataState = STATE_DATA_IDLE;
+          return true;
         }
         break;
       }
@@ -94,11 +100,13 @@ void processFrskyTelemetryData(uint8_t data)
 
   } // switch
 
-#if defined(TELEMETRY_FRSKY_SPORT)
   if (IS_FRSKY_SPORT_PROTOCOL() && telemetryRxBufferCount >= FRSKY_SPORT_PACKET_SIZE) {
-    sportProcessPacket(telemetryRxBuffer);
+    // end of frame detected
     dataState = STATE_DATA_IDLE;
+    return true;
   }
-#endif
+
+  return false;
 }
+
 
