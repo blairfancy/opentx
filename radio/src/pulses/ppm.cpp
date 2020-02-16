@@ -77,4 +77,9 @@ void setupPulsesPPMExternalModule()
   setupPulsesPPM(&extmodulePulsesData.ppm, g_model.moduleData[EXTERNAL_MODULE].channelsStart, g_model.moduleData[EXTERNAL_MODULE].channelsCount, g_model.moduleData[EXTERNAL_MODULE].ppm.frameLength);
 }
 
-
+#if defined(PCBSKY9X)
+void setupPulsesPPMExtraModule()
+{
+  setupPulsesPPM(&extramodulePulsesData.ppm, g_model.moduleData[EXTRA_MODULE].channelsStart, g_model.moduleData[EXTRA_MODULE].channelsCount, g_model.moduleData[EXTRA_MODULE].ppm.frameLength);
+}
+#endif

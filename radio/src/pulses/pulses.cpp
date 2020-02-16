@@ -26,6 +26,7 @@ uint8_t s_pulses_paused = 0;
 ModuleState moduleState[NUM_MODULES];
 InternalModulePulsesData intmodulePulsesData __DMA;
 ExternalModulePulsesData extmodulePulsesData __DMA;
+ExtraModulePulsesData extramodulePulsesData __DMA;
 TrainerPulsesData trainerPulsesData __DMA;
 
 void ModuleState::startBind(BindInformation * destination, ModuleCallback bindCallback)
@@ -54,6 +55,13 @@ uint8_t getModuleType(uint8_t module)
     return type;
   }
 
+#if defined(PCBSKY9X)
+  if (module == EXTRA_MODULE && isExtraModuleAvailable(type)) {
+    return type;
+  }	
+#endif
+	
+	
   return MODULE_TYPE_NONE;
 }
 
@@ -286,6 +294,61 @@ bool setupPulsesExternalModule(uint8_t protocol)
       return false;
   }
 }
+
+#if defined(PCBSKY9X)
+void enablePulsesExtraModule(uint8_t protocol)
+{
+  // start new protocol hardware here
+
+  switch (protocol) {
+
+#if defined(PPM)
+    case PROTOCOL_CHANNELS_PPM:
+      extramodulePpmStart();
+      break;
+#endif
+
+    default:
+      break;
+  }
+}
+
+bool setupPulsesExtraModule(uint8_t protocol)
+{
+  switch (protocol) {
+
+#if defined(PPM)
+    case PROTOCOL_CHANNELS_PPM:
+      setupPulsesPPMExtraModule();
+      scheduleNextMixerCalculation(EXTRA_MODULE, PPM_PERIOD(EXTRA_MODULE));
+      return true;
+#endif
+
+    default:
+      scheduleNextMixerCalculation(EXTRA_MODULE, 50/*ms*/);
+      return false;
+  }
+}
+
+
+bool setupPulsesExtraModule()
+{
+  uint8_t protocol = getRequiredProtocol(EXTRA_MODULE);
+
+  heartbeat |= (HEART_TIMER_PULSES << EXTRA_MODULE);
+
+  if (moduleState[EXTRA_MODULE].protocol != protocol) {
+    extramoduleStop();
+    moduleState[EXTRA_MODULE].protocol = protocol;
+    enablePulsesExtraModule(protocol);
+    return false;
+  }
+  else {
+    return setupPulsesExtraModule(protocol);
+  }
+}
+#endif
+
 
 #if defined(HARDWARE_INTERNAL_MODULE)
 static void enablePulsesInternalModule(uint8_t protocol)

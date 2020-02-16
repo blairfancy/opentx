@@ -108,15 +108,16 @@ void init_second_ppm(uint32_t period)
   setExtraModulePolarity();
 }
 
-/*
-// TODO re-add it later
+
+
 void disable_second_ppm()
 {
   Pio * pioptr = PIOC;
   pioptr->PIO_PER = PIO_PC15;           // Assign C17 to PIO
   PWM->PWM_IDR1 = PWM_IDR1_CHID1;
 }
-
+// TODO re-add it later
+/*
 void init_module_timer(uint32_t port, uint32_t period, uint8_t state)
 {
   if (port == EXTERNAL_MODULE) {
@@ -187,6 +188,12 @@ void extmoduleStop()
 {
   disable_ssc();
   disable_main_ppm();
+}
+
+
+void extramoduleStop()
+{
+  disable_second_ppm();
 }
 
 void extmoduleSerialStart(uint32_t baudrate, uint32_t period_half_us, bool inverted)
@@ -302,11 +309,13 @@ extern "C" void PWM_IRQHandler(void)
 
   if (reason & PWM_ISR1_CHID1) {
     // TODO EXTRA_MODULE will be broken
-    /*pwmptr->PWM_CH_NUM[1].PWM_CPDRUPD = *modulePulsesData[EXTRA_MODULE].ppm.ptr++;
-    if (*modulePulsesData[EXTRA_MODULE].ppm.ptr == 0) {
-      setupPulses(EXTRA_MODULE);
+#if defined(PCBSKY9X)
+    pwmptr->PWM_CH_NUM[1].PWM_CPDRUPD = *extramodulePulsesData.ppm.ptr++;
+    if (*extramodulePulsesData.ppm.ptr == 0) {
+      setupPulsesExtraModule();
       setExtraModulePolarity();
-    }*/
+    }
+#endif
   }
 }
 #endif

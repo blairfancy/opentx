@@ -295,6 +295,12 @@ union ExternalModulePulsesData {
   CrossfirePulsesData crossfire;
 } __ALIGNED(4);
 
+#if defined(PCBSKY9X)
+union ExtraModulePulsesData {
+	PpmPulsesData<pulse_duration_t> ppm;
+} __ALIGNED(4);
+#endif
+
 /* The __ALIGNED keyword is required to align the struct inside the modulePulsesData below,
  * which is also defined to be __DMA  (which includes __ALIGNED) aligned.
  * Arrays in C/C++ are always defined to be *contiguously*. The first byte of the second element is therefore always
@@ -304,6 +310,7 @@ union ExternalModulePulsesData {
 
 extern InternalModulePulsesData intmodulePulsesData;
 extern ExternalModulePulsesData extmodulePulsesData;
+extern ExtraModulePulsesData extramodulePulsesData;
 
 union TrainerPulsesData {
   PpmPulsesData<trainer_pulse_duration_t> ppm;
@@ -313,6 +320,12 @@ extern TrainerPulsesData trainerPulsesData;
 
 #if defined(HARDWARE_INTERNAL_MODULE)
 bool setupPulsesInternalModule();
+#endif
+#if defined(PCBSKY9X)
+  void extramodulePpmStart();
+  bool setupPulsesExtraModule();
+  void setupPulsesPPMExtraModule();
+  void extramoduleStop();
 #endif
 bool setupPulsesExternalModule();
 void setupPulsesDSM2();
@@ -345,8 +358,8 @@ inline void startPulses()
 
   setupPulsesExternalModule();
 
-#if defined(HARDWARE_EXTRA_MODULE)
-  extramodulePpmStart();
+#if defined(PCBSKY9X)	
+  setupPulsesExtraModule();
 #endif
 }
 
