@@ -53,19 +53,21 @@ bool GeneralSettings::switchSourceAllowedTaranis(int index) const
 
 bool GeneralSettings::isPotAvailable(int index) const
 {
-  if (index<0 || index>getBoardCapability(getCurrentBoard(), Board::Pots)) return false;
+  if (index < 0 || index > getBoardCapability(getCurrentBoard(), Board::Pots))
+    return false;
   return potConfig[index] != Board::POT_NONE;
 }
 
 bool GeneralSettings::isSliderAvailable(int index) const
 {
-  if (index<0 || index>getBoardCapability(getCurrentBoard(), Board::Sliders)) return false;
+  if (index < 0 || index > getBoardCapability(getCurrentBoard(), Board::Sliders))
+    return false;
   return sliderConfig[index] != Board::SLIDER_NONE;
 }
 
 GeneralSettings::GeneralSettings()
 {
-  memset(this, 0, sizeof(GeneralSettings));
+  memset(reinterpret_cast<void *>(this), 0, sizeof(GeneralSettings));
 
   contrast  = 25;
 
@@ -86,11 +88,11 @@ GeneralSettings::GeneralSettings()
     vBatMin = -5;   //8,5V
     vBatMax = -5;   //11,5V
   }
-  else if (IS_TARANIS_XLITE(board) || IS_HORUS_X10(board)) {
+  else if (IS_TARANIS_XLITE(board) || IS_HORUS_X10(board) || IS_JUMPER_T16(board)) {
     // Lipo 2S
     vBatWarn = 66;
     vBatMin = -23;  // 6.7V
-    vBatMax = -37;  // 8.3V 
+    vBatMax = -37;  // 8.3V
   }
   else if (IS_TARANIS(board)) {
     // NI-MH 7.2V, X9D, X9D+ and X7
@@ -112,11 +114,13 @@ GeneralSettings::GeneralSettings()
     speakerVolume = 12;
   }
 
-  if (IS_HORUS(board)) {
-    strcpy(bluetoothName, "Horus");
+  if (IS_JUMPER_T16(board))
+    strcpy(bluetoothName, "t16");
+  else if (IS_HORUS(board)) {
+    strcpy(bluetoothName, "horus");
   }
   else if (IS_TARANIS_X9E(board) || IS_TARANIS_SMALL(board)) {
-    strcpy(bluetoothName, "Taranis");
+    strcpy(bluetoothName, "taranis");
   }
 
   templateSetup = g.profile[g.sessionId()].channelOrder();
@@ -249,6 +253,10 @@ void GeneralSettings::setDefaultControlTypes(Board::Type board)
     potConfig[0] = Board::POT_WITH_DETENT;
     potConfig[1] = Board::POT_WITH_DETENT;
   }
+  else if (IS_JUMPER_T12(board)) {
+    potConfig[0] = Board::POT_WITH_DETENT;
+    potConfig[1] = Board::POT_WITH_DETENT;
+  }
   else {
     potConfig[0] = Board::POT_WITHOUT_DETENT;
     potConfig[1] = Board::POT_WITHOUT_DETENT;
@@ -261,7 +269,7 @@ void GeneralSettings::setDefaultControlTypes(Board::Type board)
     sliderConfig[2] = Board::SLIDER_WITH_DETENT;
     sliderConfig[3] = Board::SLIDER_WITH_DETENT;
   }
-  else if (IS_TARANIS_X9(board) || IS_HORUS_X10(board)) {
+  else if (IS_TARANIS_X9(board) || IS_HORUS_X10(board) || IS_JUMPER_T16(board)) {
     sliderConfig[0] = Board::SLIDER_WITH_DETENT;
     sliderConfig[1] = Board::SLIDER_WITH_DETENT;
   }
@@ -314,6 +322,20 @@ void GeneralSettings::convert(RadioDataConversionState & cstate)
     if (IS_TARANIS_X9(cstate.toType) || IS_HORUS(cstate.toType)) {
       strncpy(switchName[5], switchName[4], sizeof(switchName[5]));
       strncpy(switchName[7], switchName[5], sizeof(switchName[7]));
+    }
+  }
+
+  if (IS_JUMPER_T12(cstate.toType)) {
+    if (IS_TARANIS_X9(cstate.fromType) || IS_HORUS(cstate.fromType)) {
+      strncpy(switchName[4], switchName[5], sizeof(switchName[0]));
+      strncpy(switchName[5], switchName[7], sizeof(switchName[0]));
+    }
+  }
+
+  else if (IS_JUMPER_T12(cstate.fromType)) {
+    if (IS_TARANIS_X9(cstate.toType) || IS_HORUS(cstate.toType)) {
+      strncpy(switchName[5], switchName[4], sizeof(switchName[0]));
+      strncpy(switchName[7], switchName[5], sizeof(switchName[0]));
     }
   }
 

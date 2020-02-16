@@ -151,12 +151,20 @@ ui(new Ui::GeneralSetup)
     ui->adjustRTC->hide();
   }
 
-  if (IS_STM32(firmware->getBoard())){
+  if (IS_STM32(firmware->getBoard())) {
     ui->usbModeCB->setCurrentIndex(generalSettings.usbMode);
   }
   else {
     ui->usbModeLabel->hide();
     ui->usbModeCB->hide();
+  }
+  
+  if (firmware->getCapability(HasSwitchableJack)) {
+    ui->jackModeCB->setCurrentIndex(generalSettings.jackMode);
+  }
+  else {
+    ui->jackModeLabel->hide();
+    ui->jackModeCB->hide();
   }
 
   if (!firmware->getCapability(OptrexDisplay)) {
@@ -247,6 +255,17 @@ ui(new Ui::GeneralSetup)
     ui->splashScreenChkB->setChecked(!generalSettings.splashMode);
   }
 
+  if (!firmware->getCapability(PwrButtonPress)) {
+    ui->pwrOnDelayLabel->hide();
+    ui->pwrOnDelay->hide();
+    ui->pwrOffDelayLabel->hide();
+    ui->pwrOffDelay->hide();
+  }
+  else if (!IS_TARANIS(firmware->getBoard())) {
+    ui->pwrOnDelayLabel->hide();
+    ui->pwrOnDelay->hide();
+  }
+  
   setValues();
 
   lock = false;
@@ -353,6 +372,15 @@ void GeneralSetupPanel::on_usbModeCB_currentIndexChanged(int index)
   }
 }
 
+void GeneralSetupPanel::on_jackModeCB_currentIndexChanged(int index)
+{
+  if (!lock) {
+    generalSettings.jackMode = ui->jackModeCB->currentIndex();
+    emit modified();
+  }
+}
+
+
 void GeneralSetupPanel::on_backlightColor_SL_valueChanged()
 {
   if (!lock) {
@@ -424,6 +452,12 @@ void GeneralSetupPanel::setValues()
     ui->vBatMinDSB->setValue((double)(generalSettings.vBatMin + 90) / 10);
     ui->vBatMaxDSB->setValue((double)(generalSettings.vBatMax + 120) / 10);
   }
+
+  ui->pwrOnDelay->setValue(2 - generalSettings.pwrOnSpeed);
+  ui->pwrOffDelay->setValue(2 - generalSettings.pwrOffSpeed);
+
+    // TODO: only if ACCESS available??
+  ui->registrationId->setText(generalSettings.registrationId);
 }
 
 void GeneralSetupPanel::on_faimode_CB_stateChanged(int)
@@ -476,6 +510,17 @@ void GeneralSetupPanel::on_splashScreenDuration_currentIndexChanged(int index)
   emit modified();
 }
 
+void GeneralSetupPanel::on_pwrOnDelay_valueChanged()
+{
+  generalSettings.pwrOnSpeed = 2 - ui->pwrOnDelay->value();
+  emit modified();
+}
+
+void GeneralSetupPanel::on_pwrOffDelay_valueChanged()
+{
+  generalSettings.pwrOffSpeed = 2 - ui->pwrOffDelay->value();
+  emit modified();
+}
 
 void GeneralSetupPanel::on_beepVolume_SL_valueChanged()
 {
@@ -702,6 +747,15 @@ void GeneralSetupPanel::unlockSwitchEdited()
 void GeneralSetupPanel::on_blAlarm_ChkB_stateChanged()
 {
   generalSettings.flashBeep = ui->blAlarm_ChkB->isChecked();
+  emit modified();
+}
+
+void GeneralSetupPanel::on_registrationId_editingFinished()
+{
+  //copy ownerID back to generalSettings.registrationId
+  QByteArray array = ui->registrationId->text().toLocal8Bit();
+  strncpy(generalSettings.registrationId, array, 8);
+  generalSettings.registrationId[8] = '\0';
   emit modified();
 }
 
