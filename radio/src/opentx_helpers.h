@@ -2,7 +2,6 @@
  * Copyright (C) OpenTX
  *
  * Based on code named
- *   cleanflight - https://github.com/cleanflight
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -19,28 +18,13 @@
  * GNU General Public License for more details.
  */
 
-#ifndef _GPS_H_
-#define _GPS_H_
+#ifndef _OPENTX_HELPERS_H_
+#define _OPENTX_HELPERS_H_
 
-#include <inttypes.h>
+template<class t> inline t min(t a, t b) { return a<b?a:b; }
+template<class t> inline t max(t a, t b) { return a>b?a:b; }
+template<class t> inline t sgn(t a) { return a>0 ? 1 : (a < 0 ? -1 : 0); }
+template<class t> inline t limit(t mi, t x, t ma) { return min(max(mi,x),ma); }
+template<class t> inline void SWAP(t & a, t & b) { t tmp = b; b = a; a = tmp; }
 
-struct gpsdata_t
-{
-  int32_t longitude;              // degrees * 1.000.000
-  int32_t latitude;               // degrees * 1.000.000
-  uint8_t fix;
-  uint8_t numSat;
-  uint32_t packetCount;
-  uint32_t errorCount;
-  uint16_t altitude;              // altitude in 0.1m
-  uint16_t speed;                 // speed in 0.1m/s
-  uint16_t groundCourse;          // degrees * 10
-  uint16_t hdop;
-};
-
-extern gpsdata_t gpsData;
-void gpsWakeup();
-
-void gpsSendFrame(const char * frame);
-
-#endif // _GPS_H_
+#endif // _OPENTX_HELPERS_H_

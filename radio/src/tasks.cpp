@@ -73,52 +73,81 @@ bool isForcePowerOffRequested()
   return false;
 }
 
+bool isModuleSynchronous(uint8_t moduleIdx)
+{
+  uint8_t protocol = moduleState[moduleIdx].protocol;
+  if (protocol == PROTOCOL_CHANNELS_PXX2_HIGHSPEED || protocol == PROTOCOL_CHANNELS_PXX2_LOWSPEED || protocol == PROTOCOL_CHANNELS_CROSSFIRE || protocol == PROTOCOL_CHANNELS_NONE)
+    return true;
+#if defined(INTMODULE_USART) || defined(EXTMODULE_USART)
+  if (protocol == PROTOCOL_CHANNELS_PXX1_SERIAL)
+    return true;
+#endif
+  return false;
+}
+
+void sendSynchronousPulses(uint8_t runMask)
+{
+#if defined(HARDWARE_INTERNAL_MODULE)
+  if ((runMask & (1 << INTERNAL_MODULE)) && isModuleSynchronous(INTERNAL_MODULE)) {
+    if (setupPulsesInternalModule())
+      intmoduleSendNextFrame();
+  }
+#endif
+
+  if ((runMask & (1 << EXTERNAL_MODULE)) && isModuleSynchronous(EXTERNAL_MODULE)) {
+    if (setupPulsesExternalModule())
+      extmoduleSendNextFrame();
+  }
+}
+
 uint32_t nextMixerTime[NUM_MODULES];
 
 TASK_FUNCTION(mixerTask)
 {
-  static uint32_t lastRunTime;
   s_pulses_paused = true;
 
-  while(1) {
-
-#if defined(SBUS)
+  while (true) {
+#if defined(PCBTARANIS) && defined(SBUS)
+    // SBUS trainer
     processSbusInput();
+#endif
+
+#if defined(GYRO)
+    gyro.wakeup();
+#endif
+
+#if defined(BLUETOOTH)
+    bluetooth.wakeup();
 #endif
 
     RTOS_WAIT_TICKS(1);
 
 #if defined(SIMU)
-    if (pwrCheck() == e_power_off)
+    if (pwrCheck() == e_power_off) {
       TASK_RETURN();
+    }
 #else
     if (isForcePowerOffRequested()) {
-      pwrOff();
+      boardOff();
     }
 #endif
 
-    uint32_t now = RTOS_GET_TIME();
-    bool run = false;
-#if !defined(SIMU) && defined(STM32)
-    if ((now - lastRunTime) >= (usbStarted() ? 5 : 10)) {     // run at least every 20ms (every 10ms if USB is active)
-#else
-    if ((now - lastRunTime) >= 10) {     // run at least every 20ms
-#endif
-      run = true;
+    uint32_t now = RTOS_GET_MS();
+    uint8_t runMask = 0;
+
+    if (now >= nextMixerTime[0]) {
+      runMask |= (1 << 0);
     }
-    else if (now == nextMixerTime[0]) {
-      run = true;
-    }
+
 #if NUM_MODULES >= 2
-    else if (now == nextMixerTime[1]) {
-      run = true;
+    if (now >= nextMixerTime[1]) {
+      runMask |= (1 << 1);
     }
 #endif
-    if (!run) {
+
+    if (!runMask) {
       continue;  // go back to sleep
     }
-
-    lastRunTime = now;
 
     if (!s_pulses_paused) {
       uint16_t t0 = getTmr2MHz();
@@ -137,36 +166,48 @@ TASK_FUNCTION(mixerTask)
       }
 #endif
 
-#if defined(TELEMETRY_FRSKY)
+#if defined(PCBSKY9X) && !defined(SIMU)
+      usbJoystickUpdate();
+#endif
+
       DEBUG_TIMER_START(debugTimerTelemetryWakeup);
       telemetryWakeup();
       DEBUG_TIMER_STOP(debugTimerTelemetryWakeup);
-#endif
-
-#if defined(BLUETOOTH)
-      bluetoothWakeup();
-#endif
 
       if (heartbeat == HEART_WDT_CHECK) {
-        wdt_reset();
+        WDG_RESET();
         heartbeat = 0;
       }
 
       t0 = getTmr2MHz() - t0;
-      if (t0 > maxMixerDuration) maxMixerDuration = t0 ;
+      if (t0 > maxMixerDuration)
+        maxMixerDuration = t0;
+
+      sendSynchronousPulses(runMask);
     }
   }
 }
 
-void scheduleNextMixerCalculation(uint8_t module, uint16_t period_ms)
+void scheduleNextMixerCalculation(uint8_t module, uint32_t period_ms)
 {
   // Schedule next mixer calculation time,
-  // for now assume mixer calculation takes 2 ms.
-  nextMixerTime[module] = (uint32_t)RTOS_GET_TIME() + period_ms / 2 - 1/*2ms*/;
+
+  if (isModuleSynchronous(module)) {
+    nextMixerTime[module] += period_ms / RTOS_MS_PER_TICK;
+    if (nextMixerTime[module] < RTOS_GET_TIME()) {
+      // we are late ... let's add some small delay
+      nextMixerTime[module] = (uint32_t) RTOS_GET_TIME() + (period_ms / RTOS_MS_PER_TICK);
+    }
+  }
+  else {
+    // for now assume mixer calculation takes 2 ms.
+    nextMixerTime[module] = (uint32_t) RTOS_GET_TIME() + (period_ms / RTOS_MS_PER_TICK);
+  }
+
   DEBUG_TIMER_STOP(debugTimerMixerCalcToUsage);
 }
 
-#define MENU_TASK_PERIOD_TICKS      25    // 50ms
+#define MENU_TASK_PERIOD_TICKS         (50 / RTOS_MS_PER_TICK)    // 50ms
 
 #if defined(COLORLCD) && defined(CLI)
 bool perMainEnabled = true;
@@ -177,7 +218,7 @@ TASK_FUNCTION(menusTask)
   opentxInit();
 
 #if defined(PWR_BUTTON_PRESS)
-  while (1) {
+  while (true) {
     uint32_t pwr_check = pwrCheck();
     if (pwr_check == e_power_off) {
       break;
@@ -233,11 +274,11 @@ void tasksStart()
   cliStart();
 #endif
 
-  RTOS_CREATE_TASK(mixerTaskId, mixerTask, "Mixer", mixerStack, MIXER_STACK_SIZE, MIXER_TASK_PRIO);
-  RTOS_CREATE_TASK(menusTaskId, menusTask, "Menus", menusStack, MENUS_STACK_SIZE, MENUS_TASK_PRIO);
+  RTOS_CREATE_TASK(mixerTaskId, mixerTask, "mixer", mixerStack, MIXER_STACK_SIZE, MIXER_TASK_PRIO);
+  RTOS_CREATE_TASK(menusTaskId, menusTask, "menus", menusStack, MENUS_STACK_SIZE, MENUS_TASK_PRIO);
 
 #if !defined(SIMU)
-  RTOS_CREATE_TASK(audioTaskId, audioTask, "Audio", audioStack, AUDIO_STACK_SIZE, AUDIO_TASK_PRIO);
+  RTOS_CREATE_TASK(audioTaskId, audioTask, "audio", audioStack, AUDIO_STACK_SIZE, AUDIO_TASK_PRIO);
 #endif
 
   RTOS_CREATE_MUTEX(audioMutex);

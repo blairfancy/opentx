@@ -157,6 +157,17 @@ const char * const unitsFilenames[] = {
   "radian",
   "ml",
   "founce",
+  "mlpm",
+  "spare1",
+  "spare2",
+  "spare3",
+  "spare4",
+  "spare5",
+  "spare6",
+  "spare7",
+  "spare8",
+  "spare9",
+  "spare10",
   "hour",
   "minute",
   "second",
@@ -518,7 +529,7 @@ void audioTask(void * pdata)
   RTOS_WAIT_MS(1000); // 1s
 #endif
 
-  if (!unexpectedShutdown) {
+  if (!globalData.unexpectedShutdown) {
     AUDIO_HELLO();
   }
 
@@ -744,7 +755,7 @@ void AudioQueue::wakeup()
   DEBUG_TIMER_STOP(debugTimerAudioConsume);
 
   AudioBuffer * buffer;
-  while ((buffer = buffersFifo.getEmptyBuffer()) != 0) {
+  while ((buffer = buffersFifo.getEmptyBuffer()) != nullptr) {
     int result;
     unsigned int fade = 0;
     int size = 0;

@@ -2,7 +2,6 @@
  * Copyright (C) OpenTX
  *
  * Based on code named
- *   cleanflight - https://github.com/cleanflight
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -19,28 +18,38 @@
  * GNU General Public License for more details.
  */
 
-#ifndef _GPS_H_
-#define _GPS_H_
+#ifndef _DEBOUNCE_H_
+#define _DEBOUNCE_H_
 
-#include <inttypes.h>
+#include "board.h"
 
-struct gpsdata_t
+template <class T>
+class Debounce
 {
-  int32_t longitude;              // degrees * 1.000.000
-  int32_t latitude;               // degrees * 1.000.000
-  uint8_t fix;
-  uint8_t numSat;
-  uint32_t packetCount;
-  uint32_t errorCount;
-  uint16_t altitude;              // altitude in 0.1m
-  uint16_t speed;                 // speed in 0.1m/s
-  uint16_t groundCourse;          // degrees * 10
-  uint16_t hdop;
+  public:
+    T debounce(T state)
+    {
+      if (state == lastState)
+        debouncedState = state;
+      else
+        lastState = state;
+      return debouncedState;
+    }
+
+  private:
+    T lastState;
+    T debouncedState;
 };
 
-extern gpsdata_t gpsData;
-void gpsWakeup();
+#if defined(STM32)
+class PinDebounce: public Debounce<uint8_t>
+{
+  public:
+    uint8_t debounce(GPIO_TypeDef * GPIOx, uint16_t GPIO_Pin)
+    {
+      return Debounce<uint8_t>::debounce(GPIO_ReadInputDataBit(GPIOx, GPIO_Pin));
+    }
+};
+#endif
 
-void gpsSendFrame(const char * frame);
-
-#endif // _GPS_H_
+#endif // _DEBOUNCE_H_

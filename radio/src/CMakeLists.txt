@@ -1,7 +1,7 @@
 include(CMakeForceCompiler)
 include(Bitmaps)
 
-set(PCB_TYPES X7 XLITE X9D X9D+ X9E X10 X12S SKY9X 9XRPRO AR9X)
+set(PCB_TYPES X9LITE X9LITES X7 XLITE XLITES X9D X9D+ X9E X10 X12S SKY9X 9XRPRO AR9X)
 set(GUI_LANGUAGES CZ DE EN ES FR IT PT SK SE PL HU NL)
 set(TTS_LANGUAGES CZ DE EN ES FR IT PT SK SE PL HU NL RU)
 
@@ -16,6 +16,7 @@ set_property(CACHE PPM_UNIT PROPERTY STRINGS US PERCENT_PREC1 PERCENT_PREC0)
 set(DEFAULT_MODE "" CACHE STRING "Default sticks mode")
 set(FONT "STD" CACHE STRING "Choose font : STD or SQT5")
 set_property(CACHE FONT PROPERTY STRINGS SQT5)
+set(POPUP_LEVEL 2 CACHE STRING "Popup level")
 
 option(HELI "Heli menu" ON)
 option(FLIGHT_MODES "Flight Modes" ON)
@@ -31,7 +32,8 @@ option(AUTOSOURCE "Automatic source detection in menus" ON)
 option(AUTOSWITCH "Automatic switch detection in menus" ON)
 option(SEMIHOSTING "Enable debugger semihosting" OFF)
 option(JITTER_MEASURE "Enable ADC jitter measurement" OFF)
-option(WATCHDOG_DISABLED "Disable hardware Watchdog" OFF)
+option(WATCHDOG "Enable hardware Watchdog" ON)
+option(ASTERISK "Enable asterisk icon (test only firmware)" OFF)
 if(SDL_FOUND)
   option(SIMU_AUDIO "Enable simulator audio." ON)
 endif()
@@ -45,9 +47,14 @@ option(TRACE_SIMPGMSPACE "Turn on traces in simpgmspace.cpp" ON)
 option(TRACE_LUA_INTERNALS "Turn on traces for Lua internals" OFF)
 option(FRSKY_STICKS "Reverse sticks for FrSky sticks" OFF)
 option(NANO "Use nano newlib and binalloc")
-option(NIGHTLY_BUILD_WARNING "Warn this is a nightly build" OFF)
-option(MODULE_R9M_FLEX_FW "Add R9M options for non certified firmwwares" OFF)
-option(PXX2 "Enable PXX v2 support" OFF)
+option(TEST_BUILD_WARNING "Warn this is a test build" OFF)
+option(MODULE_PROTOCOL_FCC "Add support for FCC modules" ON)
+option(MODULE_PROTOCOL_LBT "Add support for EU/LBT modules" ON)
+option(MODULE_PROTOCOL_FLEX "Add support for non certified FLEX modules" OFF)
+option(MODULE_PROTOCOL_D8 "Add support for D8 modules" ON)
+option(FRSKY_RELEASE "Used to build FrSky released firmware" OFF)
+option(TBS_RELEASE "Used to build TBS released firmware" OFF)
+option(ALLOW_TRAINER_MULTI "Allow multi trainer" OFF)
 
 # since we reset all default CMAKE compiler flags for firmware builds, provide an alternate way for user to specify additional flags.
 set(FIRMWARE_C_FLAGS "" CACHE STRING "Additional flags for firmware target c compiler (note: all CMAKE_C_FLAGS[_*] are ignored for firmware/bootloader).")
@@ -72,7 +79,7 @@ set(GVARS_VARIANT   1)
 set(FRSKY_VARIANT   2)
 set(3POS_VARIANT    4)
 
-set(FIRMWARE_DEPENDENCIES firmware_translations)
+set(RADIO_DEPENDENCIES firmware_translations)
 
 set(FATFS_SRC
   ${FATFS_DIR}/ff.c
@@ -82,7 +89,7 @@ set(FATFS_SRC
 
 if(PCB STREQUAL X12S OR PCB STREQUAL X10)
   include(targets/horus/CMakeLists.txt)
-elseif(PCB STREQUAL X9E OR PCB STREQUAL X9D+ OR PCB STREQUAL X9D OR PCB STREQUAL X7 OR PCB STREQUAL XLITE)
+elseif(PCB STREQUAL X9E OR PCB STREQUAL X9D+ OR PCB STREQUAL X9D OR PCB STREQUAL X7 OR PCB STREQUAL X9LITE OR PCB STREQUAL X9LITES OR PCB STREQUAL XLITE OR PCB STREQUAL XLITES)
   include(targets/taranis/CMakeLists.txt)
 elseif(PCB STREQUAL SKY9X OR PCB STREQUAL 9XRPRO OR PCB STREQUAL AR9X)
   include(targets/sky9x/CMakeLists.txt)
@@ -133,10 +140,7 @@ else()
   add_definitions(-DEEPROM -DEEPROM_RAW)
 endif()
 
-if(ARCH STREQUAL ARM AND NOT PCB STREQUAL X12S AND NOT PCB STREQUAL X10 AND NOT PCB STREQUAL XLITE)
-  add_definitions(-DEEPROM_CONVERSIONS)
-  set(SRC ${SRC} storage/eeprom_conversions.cpp)
-endif()
+include(storage/conversions/CMakeLists.txt)
 
 add_definitions(-DFLAVOUR="${FLAVOUR}")
 
@@ -144,12 +148,13 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/bitmaps/${GUI_DIR})
 
-add_subdirectory(lua)
 include(gui/CMakeLists.txt)
 
-if(RAMBACKUP)
-  add_definitions(-DRAMBACKUP)
-  set(SRC ${SRC} storage/rambackup.cpp storage/rlc.cpp)
+if(RTC_BACKUP_RAM)
+  add_definitions(-DRTC_BACKUP_RAM)
+  set(SRC ${SRC} storage/rlc.cpp)
+  set(FIRMWARE_SRC ${FIRMWARE_SRC} storage/rtc_backup.cpp)
+  set(GTEST_SRC ${GTEST_SRC} ${RADIO_SRC_DIRECTORY}/storage/rtc_backup.cpp)
 endif()
 
 if(NOT LUA STREQUAL NO)
@@ -164,7 +169,7 @@ if(NOT LUA STREQUAL NO)
     add_definitions(-DLUA_SCRIPT_LOAD_MODE="${LUA_SCRIPT_LOAD_MODE}")
   endif()
   include_directories(${LUA_DIR})
-  set(FIRMWARE_DEPENDENCIES ${FIRMWARE_DEPENDENCIES} ${LUA_EXPORT})
+  set(RADIO_DEPENDENCIES ${RADIO_DEPENDENCIES} ${LUA_EXPORT})
   if(LUA STREQUAL YES)
     add_definitions(-DLUA_MODEL_SCRIPTS)
     set(GUI_SRC ${GUI_SRC} model_custom_scripts.cpp)
@@ -232,8 +237,12 @@ if(JITTER_MEASURE)
   add_definitions(-DJITTER_MEASURE)
 endif()
 
-if(WATCHDOG_DISABLED)
-  add_definitions(-DWATCHDOG_DISABLED)
+if(ASTERISK)
+  add_definitions(-DASTERISK)
+endif()
+
+if(WATCHDOG)
+  add_definitions(-DWATCHDOG)
 endif()
 
 if(SIMU_AUDIO)
@@ -279,9 +288,7 @@ if(DANGEROUS_MODULE_FUNCTIONS)
   add_definitions(-DDANGEROUS_MODULE_FUNCTIONS)
 endif()
 
-if(SPLASH STREQUAL FRSKY)
-  add_definitions(-DSPLASH -DSPLASH_FRSKY)
-elseif(NOT SPLASH STREQUAL OFF)
+if(NOT SPLASH STREQUAL OFF)
   add_definitions(-DSPLASH)
 endif()
 
@@ -309,17 +316,44 @@ if(EEPROM_VARIANT_NEEDED)
   add_definitions(-DEEPROM_VARIANT=${EEPROM_VARIANT})
 endif()
 
-if(NIGHTLY_BUILD_WARNING)
-  add_definitions(-DNIGHTLY_BUILD_WARNING)
-endif(NIGHTLY_BUILD_WARNING)
-
-if(MODULE_R9M_FLEX_FW)
-  add_definitions(-DMODULE_R9M_FLEX_FW)
+if(TEST_BUILD_WARNING)
+  add_definitions(-DTEST_BUILD_WARNING)
 endif()
 
-if(PXX2)
-  add_definitions(-DPXX2)
+if(MODULE_PROTOCOL_FCC)
+  add_definitions(-DMODULE_PROTOCOL_FCC)
 endif()
+
+if(MODULE_PROTOCOL_LBT)
+  add_definitions(-DMODULE_PROTOCOL_LBT)
+endif()
+
+if(MODULE_PROTOCOL_FLEX)
+  add_definitions(-DMODULE_PROTOCOL_FLEX)
+endif()
+
+if(MODULE_PROTOCOL_D8)
+  add_definitions(-DMODULE_PROTOCOL_D8)
+endif()
+
+if(JUMPER_RELEASE)
+  add_definitions(-DJUMPER_RELEASE)
+endif()
+
+if(TBS_RELEASE)
+  add_definitions(-DTBS_RELEASE)
+endif()
+
+if(FRSKY_RELEASE)
+  add_definitions(-DFRSKY_RELEASE)
+  set(POPUP_LEVEL 3)
+endif()
+
+if(ALLOW_TRAINER_MULTI)
+  add_definitions(-DALLOW_TRAINER_MULTI)
+endif()
+
+add_definitions(-DPOPUP_LEVEL=${POPUP_LEVEL})
 
 set(SRC
   ${SRC}
@@ -330,7 +364,7 @@ set(SRC
   mixer.cpp
   stamp.cpp
   timers.cpp
-  trainer_input.cpp
+  trainer.cpp
   )
 
 if(GUI)
@@ -345,8 +379,6 @@ if(GUI)
   foreach(FILE ${GUI_SRC})
     set(SRC ${SRC} gui/${GUI_DIR}/${FILE})
   endforeach()
-  set(SRC ${SRC} gui/gui_common_arm.cpp
-      )
 endif()
 
 foreach(FILE ${TARGET_SRC})
@@ -364,7 +396,7 @@ endforeach()
 add_definitions(-DCORRECT_NEGATIVE_SHIFTS)
 
 if(NOT MSVC)
-  set(WARNING_FLAGS "${WARNING_FLAGS} -Wall -Wno-strict-aliasing -Wformat -Wreturn-type -Wunused -Wuninitialized -Wunknown-pragmas -Wno-switch -Wtype-limits")
+  set(WARNING_FLAGS "${WARNING_FLAGS} -Wall -Wno-address-of-packed-member -Wno-strict-aliasing -Wformat -Wreturn-type -Wunused -Wuninitialized -Wunknown-pragmas -Wno-switch -Wtype-limits")
   if(WARNINGS_AS_ERRORS)
     set(WARNING_FLAGS "${WARNING_FLAGS} -Werror")
   endif(WARNINGS_AS_ERRORS)
@@ -422,7 +454,6 @@ if(NOT MSVC)
   set(OPT s)
 
   if(ARCH STREQUAL ARM)
-
     enable_language(ASM)
     set(CMAKE_C_COMPILER arm-none-eabi-gcc)
     set(CMAKE_CXX_COMPILER arm-none-eabi-g++)
@@ -441,6 +472,10 @@ if(NOT MSVC)
     # these are in addition to CMAKE_CXX_FLAGS
     set(CMAKE_EXE_LINKER_FLAGS "-lm -T${RADIO_SRC_DIRECTORY}/${LINKER_SCRIPT} -Wl,-Map=firmware.map,--cref,--no-warn-mismatch,--gc-sections")
 
+    if(ACCESS_LIB)
+      set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--whole-archive ${RADIO_SRC_DIRECTORY}/${THIRDPARTY_DIR}/libACCESS/libAccess.a -Wl,--no-whole-archive")
+    endif()
+    
     if(SEMIHOSTING)
       add_definitions(-DSEMIHOSTING)
       set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --specs=rdimon.specs")
@@ -458,7 +493,7 @@ if(NOT MSVC)
       set(SRC ${SRC} bin_allocator.cpp)
     endif()
 
-    if(PCB STREQUAL XLITE OR PCB STREQUAL X9D OR PCB STREQUAL X9D+ OR PCB STREQUAL X9E OR PCB STREQUAL X7 OR PCB STREQUAL X10 OR PCB STREQUAL X12S)
+    if(PCB STREQUAL XLITE OR PCB STREQUAL XLITES OR PCB STREQUAL X9D OR PCB STREQUAL X9D+ OR PCB STREQUAL X9E OR PCB STREQUAL X7 OR PCB STREQUAL X9LITE OR PCB STREQUAL X9LITES OR PCB STREQUAL X10 OR PCB STREQUAL X12S)
       add_subdirectory(targets/common/arm/stm32/bootloader)
       include_directories(${CMAKE_CURRENT_BINARY_DIR}/targets/common/arm/stm32/bootloader)
       set(FIRMWARE_DEPENDENCIES ${FIRMWARE_DEPENDENCIES} bootloader)
@@ -477,7 +512,8 @@ if(NOT MSVC)
 
     add_executable(firmware ${SRC} ${FIRMWARE_HEADERS})
     link_libraries(firmware -lstdc++)
-    add_dependencies(firmware ${FIRMWARE_DEPENDENCIES})
+    add_dependencies(firmware ${RADIO_DEPENDENCIES} ${FIRMWARE_DEPENDENCIES})
+    set_target_properties(firmware PROPERTIES EXCLUDE_FROM_ALL TRUE)
 
     add_custom_command(
       TARGET firmware POST_BUILD
@@ -524,3 +560,7 @@ if(NOT MSVC)
   PrintTargetReport("firmware")
 
 endif(NOT MSVC)
+# Include the lua subdirectory after CMAKE_C_COMPILER has been
+# set. Otherwise, the custom commands it includes will use the
+# default CMAKE_C_COMPILER instead of the one we set manually
+add_subdirectory(lua)

@@ -42,37 +42,109 @@ void onUSBConnectMenu(const char *result)
 void handleUsbConnection()
 {
 #if defined(STM32) && !defined(SIMU)
-  if (!usbStarted() && usbPlugged() && !(getSelectedUsbMode() == USB_UNSELECTED_MODE)) {
-    usbStart();
-    if (getSelectedUsbMode() == USB_MASS_STORAGE_MODE) {
-      opentxClose(false);
-      usbPluggedIn();
-    }
-  }
-  if (!usbStarted() && usbPlugged() && getSelectedUsbMode() == USB_UNSELECTED_MODE) {
-    if((g_eeGeneral.USBMode == USB_UNSELECTED_MODE) && (popupMenuNoItems == 0)) {
-      POPUP_MENU_ADD_ITEM(STR_USB_JOYSTICK);
-      POPUP_MENU_ADD_ITEM(STR_USB_MASS_STORAGE);
+  if (!usbStarted() && usbPlugged()) {
+    if (getSelectedUsbMode() == USB_UNSELECTED_MODE) {
+      if (g_eeGeneral.USBMode == USB_UNSELECTED_MODE && popupMenuItemsCount == 0) {
+        POPUP_MENU_ADD_ITEM(STR_USB_JOYSTICK);
+        POPUP_MENU_ADD_ITEM(STR_USB_MASS_STORAGE);
 #if defined(DEBUG)
-      POPUP_MENU_ADD_ITEM(STR_USB_SERIAL);
+        POPUP_MENU_ADD_ITEM(STR_USB_SERIAL);
 #endif
-      POPUP_MENU_START(onUSBConnectMenu);
+        POPUP_MENU_START(onUSBConnectMenu);
+      }
+      else {
+        setSelectedUsbMode(g_eeGeneral.USBMode);
+      }
     }
-    if (g_eeGeneral.USBMode != USB_UNSELECTED_MODE) {
-      setSelectedUsbMode(g_eeGeneral.USBMode);
+    else {
+      if (getSelectedUsbMode() == USB_MASS_STORAGE_MODE) {
+        opentxClose(false);
+        usbPluggedIn();
+      }
+      usbStart();
     }
   }
+
   if (usbStarted() && !usbPlugged()) {
     usbStop();
     if (getSelectedUsbMode() == USB_MASS_STORAGE_MODE) {
       opentxResume();
+      putEvent(EVT_ENTRY);
     }
-#if !defined(BOOT)
     setSelectedUsbMode(USB_UNSELECTED_MODE);
-#endif
   }
 #endif // defined(STM32) && !defined(SIMU)
 }
+
+#if defined(JACK_DETECT_GPIO) && !defined(SIMU)
+bool isJackPlugged()
+{
+  // debounce
+  static bool debounced_state = 0;
+  static bool last_state = 0;
+
+  if (GPIO_ReadInputDataBit(JACK_DETECT_GPIO, JACK_DETECT_GPIO_PIN)) {
+    if (!last_state) {
+      debounced_state = false;
+    }
+    last_state = false;
+  }
+  else {
+    if (last_state) {
+      debounced_state = true;
+    }
+    last_state = true;
+  }
+  return debounced_state;
+}
+#endif
+
+#if defined(PCBXLITES)
+uint8_t jackState = SPEAKER_ACTIVE;
+
+const char STR_JACK_HEADPHONE[] = "Headphone";
+const char STR_JACK_TRAINER[] = "Trainer";
+
+void onJackConnectMenu(const char * result)
+{
+  if (result == STR_JACK_HEADPHONE) {
+    jackState = HEADPHONE_ACTIVE;
+    disableSpeaker();
+    enableHeadphone();
+  }
+  else if (result == STR_JACK_TRAINER) {
+    jackState = TRAINER_ACTIVE;
+    enableTrainer();
+  }
+}
+
+void handleJackConnection()
+{
+  if (jackState == SPEAKER_ACTIVE && isJackPlugged()) {
+    if (g_eeGeneral.jackMode == JACK_HEADPHONE_MODE) {
+      jackState = HEADPHONE_ACTIVE;
+      disableSpeaker();
+      enableHeadphone();
+    }
+    else if (g_eeGeneral.jackMode == JACK_TRAINER_MODE) {
+      jackState = TRAINER_ACTIVE;
+      enableTrainer();
+    }
+    else if (popupMenuItemsCount == 0) {
+      POPUP_MENU_ADD_ITEM(STR_JACK_HEADPHONE);
+      POPUP_MENU_ADD_ITEM(STR_JACK_TRAINER);
+      POPUP_MENU_START(onJackConnectMenu);
+    }
+  }
+  else if (jackState == SPEAKER_ACTIVE && !isJackPlugged() && popupMenuItemsCount > 0 && popupMenuHandler == onJackConnectMenu) {
+    popupMenuItemsCount = 0;
+  }
+  else if (jackState != SPEAKER_ACTIVE && !isJackPlugged()) {
+    jackState = SPEAKER_ACTIVE;
+    enableSpeaker();
+  }
+}
+#endif
 
 void checkSpeakerVolume()
 {
@@ -87,19 +159,18 @@ void checkSpeakerVolume()
 #if defined(EEPROM)
 void checkEeprom()
 {
-  if (!usbPlugged()) {
-    if (eepromIsWriting())
-      eepromWriteProcess();
-    else if (TIME_TO_WRITE())
-      storageCheck(false);
-  }
+  if (eepromIsWriting())
+    eepromWriteProcess();
+  else if (TIME_TO_WRITE())
+    storageCheck(false);
 }
 #else
 void checkEeprom()
 {
-#if defined(RAMBACKUP)
-  if (TIME_TO_RAMBACKUP()) {
-    rambackupWrite();
+#if defined(RTC_BACKUP_RAM) && !defined(SIMU)
+  if (TIME_TO_BACKUP_RAM()) {
+    if (!globalData.unexpectedShutdown)
+      rambackupWrite();
     rambackupDirtyMsk = 0;
   }
 #endif
@@ -114,14 +185,11 @@ void checkEeprom()
 void checkBatteryAlarms()
 {
   // TRACE("checkBatteryAlarms()");
-  if (IS_TXBATT_WARNING() && g_vbat100mV>50) {
+  if (IS_TXBATT_WARNING()) {
     AUDIO_TX_BATTERY_LOW();
     // TRACE("checkBatteryAlarms(): battery low");
   }
 #if defined(PCBSKY9X)
-  else if (g_eeGeneral.temperatureWarn && getTemperature() >= g_eeGeneral.temperatureWarn) {
-    AUDIO_TX_TEMP_HIGH();
-  }
   else if (g_eeGeneral.mAhWarn && (g_eeGeneral.mAhUsed + Current_used * (488 + g_eeGeneral.txCurrentCalibration)/8192/36) / 500 >= g_eeGeneral.mAhWarn) { // TODO move calculation into board file
     AUDIO_TX_MAH_HIGH();
   }
@@ -222,13 +290,14 @@ void guiMain(event_t evt)
   lcdRefreshWait();   // WARNING: make sure no code above this line does any change to the LCD display buffer!
 #endif
 
+  bool screenshotRequested = (mainRequestFlags & (1u << REQUEST_SCREENSHOT));
+
   if (!refreshNeeded) {
     DEBUG_TIMER_START(debugTimerMenus);
-    while (1) {
+    while (true) {
       // normal GUI from menus
       const char * warn = warningText;
-      uint8_t menu = popupMenuNoItems;
-
+      uint8_t menu = popupMenuItemsCount;
       static bool popupDisplayed = false;
       if (warn || menu) {
         if (popupDisplayed == false) {
@@ -238,13 +307,19 @@ void guiMain(event_t evt)
           lcdStoreBackupBuffer();
           TIME_MEASURE_STOP(storebackup);
         }
-        if (popupDisplayed == false || evt) {
+        if (popupDisplayed == false || evt || screenshotRequested) {
           popupDisplayed = lcdRestoreBackupBuffer();
-          if (warn) DISPLAY_WARNING(evt);
+          if (warn) {
+            DISPLAY_WARNING(evt);
+          }
           if (menu) {
             const char * result = runPopupMenu(evt);
             if (result) {
-              popupMenuHandler(result);
+              TRACE("popupMenuHandler(%s)", result);
+              auto handler = popupMenuHandler;
+              if (result != STR_UPDATE_LIST)
+                CLEAR_POPUP();
+              handler(result);
               if (menuEvent == 0) {
                 evt = EVT_REFRESH;
                 continue;
@@ -285,6 +360,11 @@ void guiMain(event_t evt)
     DEBUG_TIMER_STOP(debugTimerMenus);
   }
 
+  if (screenshotRequested) {
+    writeScreenshot();
+    mainRequestFlags &= ~(1u << REQUEST_SCREENSHOT);
+  }
+
   if (refreshNeeded) {
     DEBUG_TIMER_START(debugTimerLcdRefresh);
     lcdRefresh();
@@ -292,7 +372,6 @@ void guiMain(event_t evt)
   }
 }
 #elif defined(GUI)
-
 void handleGui(event_t event) {
   // if Lua standalone, run it and don't clear the screen (Lua will do it)
   // else if Lua telemetry view, run it and don't clear the screen
@@ -303,23 +382,7 @@ void handleGui(event_t event) {
   }
   else if (luaTask(event, RUN_TELEM_FG_SCRIPT, true)) {
     // the telemetry screen is active
-    // prevent events from keys MENU, UP, DOWN, ENT(short) and EXIT(short) from reaching the normal menus,
-    // so Lua telemetry script can fully use them
-    if (event) {
-      uint8_t key = EVT_KEY_MASK(event);
-#if defined(PCBXLITE)
-      // SHIFT + LEFT/RIGHT LONG used to change telemetry screen on XLITE
-      if ((!IS_KEY_LONG(event) && key == KEY_RIGHT && IS_SHIFT_PRESSED()) || (!IS_KEY_LONG(event) && key == KEY_LEFT  && IS_SHIFT_PRESSED()) || (!IS_KEY_LONG(event) && key == KEY_EXIT)) {
-#else
-      // no need to filter out MENU and ENT(short), because they are not used by menuViewTelemetryFrsky()
-      if (key == KEY_PLUS || key == KEY_MINUS || (!IS_KEY_LONG(event) && key == KEY_EXIT)) {
-#endif
-        // TRACE("Telemetry script event 0x%02x killed", event);
-        event = 0;
-      }
-    }
     menuHandlers[menuLevel](event);
-    // todo     drawStatusLine(); here???
   }
   else
 #endif
@@ -329,8 +392,6 @@ void handleGui(event_t event) {
     drawStatusLine();
   }
 }
-
-bool inPopupMenu = false;
 
 void guiMain(event_t evt)
 {
@@ -368,80 +429,90 @@ void guiMain(event_t evt)
     menuEvent = 0;
   }
 
+  if (isEventCaughtByPopup()) {
+    handleGui(0);
+  }
+  else {
+    handleGui(evt);
+    evt = 0;
+  }
+
   if (warningText) {
     // show warning on top of the normal menus
-    handleGui(0); // suppress events, they are handled by the warning
     DISPLAY_WARNING(evt);
   }
-  else if (popupMenuNoItems > 0) {
-    // popup menu is active display it on top of normal menus
-    handleGui(0); // suppress events, they are handled by the popup
-    if (!inPopupMenu) {
-      TRACE("Popup Menu started");
-      inPopupMenu = true;
-    }
+  else if (popupMenuItemsCount > 0) {
+    // show popup menu on top of the normal menus
     const char * result = runPopupMenu(evt);
     if (result) {
       TRACE("popupMenuHandler(%s)", result);
-      popupMenuHandler(result);
+      auto handler = popupMenuHandler;
+      if (result != STR_UPDATE_LIST)
+        CLEAR_POPUP();
+      handler(result);
     }
-  }
-  else {
-    // normal menus
-    if (inPopupMenu) {
-      TRACE("Popup Menu ended");
-      inPopupMenu = false;
-    }
-    handleGui(evt);
   }
 
   lcdRefresh();
+
+  if (mainRequestFlags & (1u << REQUEST_SCREENSHOT)) {
+    writeScreenshot();
+    mainRequestFlags &= ~(1u << REQUEST_SCREENSHOT);
+  }
 }
 #endif
 
 void perMain()
 {
   DEBUG_TIMER_START(debugTimerPerMain1);
-#if defined(PCBSKY9X) && !defined(REVA)
+
+#if defined(PCBSKY9X)
   calcConsumption();
 #endif
+
   checkSpeakerVolume();
-  checkEeprom();
-  logsWrite();
+
+  if (!usbPlugged()) {
+    checkEeprom();
+    logsWrite();
+  }
+
   handleUsbConnection();
+
+#if defined(PCBXLITES)
+  handleJackConnection();
+#endif
+
   checkTrainerSettings();
   periodicTick();
   DEBUG_TIMER_STOP(debugTimerPerMain1);
 
-  if (mainRequestFlags & (1 << REQUEST_FLIGHT_RESET)) {
+  if (mainRequestFlags & (1u << REQUEST_FLIGHT_RESET)) {
     TRACE("Executing requested Flight Reset");
     flightReset();
-    mainRequestFlags &= ~(1 << REQUEST_FLIGHT_RESET);
+    mainRequestFlags &= ~(1u << REQUEST_FLIGHT_RESET);
   }
 
-  doLoopCommonActions();
+  checkBacklight();
 
   event_t evt = getEvent(false);
 
-#if defined(RAMBACKUP)
-  if (unexpectedShutdown) {
+#if defined(RTC_BACKUP_RAM)
+  if (globalData.unexpectedShutdown) {
     drawFatalErrorScreen(STR_EMERGENCY_MODE);
     return;
   }
 #endif
 
 #if defined(STM32)
-  static bool sdcard_present_before = SD_CARD_PRESENT();
-  bool sdcard_present_now = SD_CARD_PRESENT();
-  if (sdcard_present_now && !sdcard_present_before) {
+  if (!usbPlugged() && SD_CARD_PRESENT() && !sdMounted()) {
     sdMount();
   }
-  sdcard_present_before = sdcard_present_now;
 #endif
 
 #if !defined(EEPROM)
   // In case the SD card is removed during the session
-  if (!SD_CARD_PRESENT() && !unexpectedShutdown) {
+  if (!usbPlugged() && !SD_CARD_PRESENT() && !globalData.unexpectedShutdown) {
     drawFatalErrorScreen(STR_NO_SDCARD);
     return;
   }
@@ -463,20 +534,13 @@ void perMain()
   DEBUG_TIMER_STOP(debugTimerGuiMain);
 #endif
 
-#if defined(PCBTARANIS)
-  if (mainRequestFlags & (1 << REQUEST_SCREENSHOT)) {
-    writeScreenshot();
-    mainRequestFlags &= ~(1 << REQUEST_SCREENSHOT);
-  }
-#endif
-
 #if defined(PCBX9E) && !defined(SIMU)
   toplcdRefreshStart();
   setTopFirstTimer(getValue(MIXSRC_FIRST_TIMER+g_model.toplcdTimer));
   setTopSecondTimer(g_eeGeneral.globalTimer + sessionTimer);
   setTopRssi(TELEMETRY_RSSI());
   setTopBatteryValue(g_vbat100mV);
-  setTopBatteryState(GET_TXBATT_BARS(), IS_TXBATT_WARNING());
+  setTopBatteryState(GET_TXBATT_BARS(10), IS_TXBATT_WARNING());
   toplcdRefreshEnd();
 #endif
 

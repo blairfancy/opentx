@@ -28,7 +28,7 @@ char hex2zchar(uint8_t hex)
   return (hex >= 10 ? hex-9 : 27+hex);
 }
 
-char idx2char(int8_t idx)
+char zchar2char(int8_t idx)
 {
   if (idx == 0) return ' ';
   if (idx < 0) {
@@ -44,7 +44,12 @@ char idx2char(int8_t idx)
   return ' ';
 }
 
-int8_t char2idx(char c)
+char char2lower(char c)
+{
+  return (c >= 'A' && c <= 'Z') ? c + 32 : c;
+}
+
+int8_t char2zchar(char c)
 {
   if (c == '_') return 37;
 #if LEN_SPECIAL_CHARS > 0
@@ -63,19 +68,29 @@ void str2zchar(char * dest, const char * src, int size)
 {
   memset(dest, 0, size);
   for (int c=0; c<size && src[c]; c++) {
-    dest[c] = char2idx(src[c]);
+    dest[c] = char2zchar(src[c]);
   }
 }
 
 int zchar2str(char * dest, const char * src, int size)
 {
   for (int c=0; c<size; c++) {
-    dest[c] = idx2char(src[c]);
+    dest[c] = zchar2char(src[c]);
   }
   do {
     dest[size--] = '\0';
   } while (size >= 0 && dest[size] == ' ');
   return size+1;
+}
+
+bool cmpStrWithZchar(const char * charString, const char * zcharString, int size)
+{
+  for (int i=0; i<size; i++) {
+    if (charString[i] != zchar2char(zcharString[i])) {
+      return false;
+    }
+  }
+  return true;
 }
 
 unsigned int effectiveLen(const char * str, unsigned int size)
@@ -122,7 +137,7 @@ char * strcat_zchar(char * dest, const char * name, uint8_t size, const char * d
         len = i+1;
       if (len) {
         if (dest[i])
-          dest[i] = idx2char(dest[i]);
+          dest[i] = zchar2char(dest[i]);
         else
           dest[i] = '_';
       }
@@ -155,7 +170,7 @@ char * strAppendStringWithIndex(char * dest, const char * s, int idx)
   return strAppendUnsigned(strAppend(dest, s), abs(idx));
 }
 
-char * getTimerString(char * dest, putstime_t tme, uint8_t hours)
+char * getTimerString(char * dest, int32_t tme, uint8_t hours)
 {
   char * s = dest;
   div_t qr;
@@ -226,7 +241,36 @@ char * getGVarString(char * dest, int idx)
   return dest;
 }
 
-char * getSwitchString(char * dest, swsrc_t idx)
+#if !defined(PCBSKY9X)
+char * getSwitchName(char * dest, swsrc_t idx)
+{
+  div_t swinfo = switchInfo(idx);
+  if (ZEXIST(g_eeGeneral.switchNames[swinfo.quot])) {
+    dest += zchar2str(dest, g_eeGeneral.switchNames[swinfo.quot], LEN_SWITCH_NAME);
+    // TODO tous zchar2str
+  }
+  else {
+    *dest++ = 'S';
+#if defined(PCBX7)
+    if (swinfo.quot >= 5)
+        *dest++ = 'H' + swinfo.quot - 5;
+      else if (swinfo.quot == 4)
+#if defined(RADIO_T12)
+        *dest++ = 'G';
+#else
+        *dest++ = 'F';
+#endif
+      else
+        *dest++ = 'A'+swinfo.quot;
+#else
+    *dest++ = 'A' + swinfo.quot;
+#endif
+  }
+  return dest;
+}
+#endif
+
+char * getSwitchPositionName(char * dest, swsrc_t idx)
 {
   if (idx == SWSRC_NONE) {
     return getStringAtIndex(dest, STR_VSWITCHES, 0);
@@ -249,26 +293,10 @@ char * getSwitchString(char * dest, swsrc_t idx)
   }
 #else
   #define IDX_TRIMS_IN_STR_VSWITCHES   (1)
-  #define IDX_ON_IN_STR_VSWITCHES      (IDX_TRIMS_IN_STR_VSWITCHES+SWSRC_LAST_TRIM-SWSRC_FIRST_TRIM+1)
+  #define IDX_ON_IN_STR_VSWITCHES      (IDX_TRIMS_IN_STR_VSWITCHES + SWSRC_LAST_TRIM - SWSRC_FIRST_TRIM + 1)
   if (idx <= SWSRC_LAST_SWITCH) {
     div_t swinfo = switchInfo(idx);
-    if (ZEXIST(g_eeGeneral.switchNames[swinfo.quot])) {
-      s += zchar2str(s, g_eeGeneral.switchNames[swinfo.quot], LEN_SWITCH_NAME);
-      // TODO tous zchar2str
-    }
-    else {
-      *s++ = 'S';
-#if defined(PCBX7)
-      if (swinfo.quot == 5)
-        *s++ = 'H';
-      else if (swinfo.quot == 4)
-        *s++ = 'F';
-      else
-        *s++ = 'A'+swinfo.quot;
-#else
-      *s++ = 'A'+swinfo.quot;
-#endif
-    }
+    s = getSwitchName(s, idx);
     *s++ = "\300-\301"[swinfo.rem];
     *s = '\0';
   }
@@ -307,6 +335,14 @@ char * getSwitchString(char * dest, swsrc_t idx)
   else if (idx == SWSRC_TELEMETRY_STREAMING) {
     strcpy(s, "Tele");
   }
+  else if (idx == SWSRC_RADIO_ACTIVITY) {
+    strcpy(s, "Act");
+  }
+#if defined(DEBUG_LATENCY)
+  else if (idx == SWSRC_LATENCY_TOGGLE) {
+    strcpy(s, "Ltc");
+  }
+#endif
   else {
     zchar2str(s, g_model.telemetrySensors[idx-SWSRC_FIRST_SENSOR].label, TELEM_LABEL_LEN);
   }
@@ -369,7 +405,7 @@ char * getSourceString(char * dest, mixsrc_t idx)
     }
   }
   else if (idx <= MIXSRC_LAST_LOGICAL_SWITCH) {
-    getSwitchString(dest, SWSRC_SW1 + idx - MIXSRC_SW1);
+    getSwitchPositionName(dest, SWSRC_SW1 + idx - MIXSRC_SW1);
   }
   else if (idx <= MIXSRC_LAST_TRAINER) {
     strAppendStringWithIndex(dest, STR_PPM_TRAINER, idx - MIXSRC_FIRST_TRAINER + 1);
@@ -416,10 +452,10 @@ char * strAppendUnsigned(char * dest, uint32_t value, uint8_t digits, uint8_t ra
     }
   }
   uint8_t idx = digits;
-  while(idx > 0) {
-    uint32_t rem = value % radix;
-    dest[--idx] = (rem >= 10 ? 'A'-10 : '0') + rem;
-    value /= radix;
+  while (idx > 0) {
+    div_t qr = div(value, radix);
+    dest[--idx] = (qr.rem >= 10 ? 'A' - 10 : '0') + qr.rem;
+    value = qr.quot;
   }
   dest[digits] = '\0';
   return &dest[digits];

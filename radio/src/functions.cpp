@@ -33,6 +33,9 @@ void testFunc()
 #ifdef SIMU
   printf("testFunc\n"); fflush(stdout);
 #endif
+
+  // for testing the WD reset uncomment the following line
+  // while (1);
 }
 #endif
 
@@ -127,10 +130,6 @@ void evalFunctions(const CustomFunctionData * functions, CustomFunctionsContext 
   uint8_t playFirstIndex = (functions == g_model.customFn ? 1 : 1+MAX_SPECIAL_FUNCTIONS);
   #define PLAY_INDEX   (i+playFirstIndex)
 
-#if defined(ROTARY_ENCODERS) && defined(GVARS)
-  static rotenc_t rePreviousValues[ROTARY_ENCODERS];
-#endif
-
 #if defined(OVERRIDE_CHANNEL_FUNCTION)
   for (uint8_t i=0; i<MAX_OUTPUT_CHANNELS; i++) {
     safetyCh[i] = OVERRIDE_CHANNEL_UNDEFINED;
@@ -155,8 +154,7 @@ void evalFunctions(const CustomFunctionData * functions, CustomFunctionsContext 
         active &= (bool)CFN_ACTIVE(cfn);
       }
 
-      if (active || IS_PLAY_BOTH_FUNC(CFN_FUNC(cfn))) {
-
+      if (active) {
         switch (CFN_FUNC(cfn)) {
 
 #if defined(OVERRIDE_CHANNEL_FUNCTION)
@@ -167,16 +165,18 @@ void evalFunctions(const CustomFunctionData * functions, CustomFunctionsContext 
 
           case FUNC_TRAINER:
           {
-            uint8_t mask = 0x0f;
-            if (CFN_CH_INDEX(cfn) > 0) {
-              mask = (1<<(CFN_CH_INDEX(cfn)-1));
-            }
-            newActiveFunctions |= mask;
+            uint8_t param = CFN_CH_INDEX(cfn);
+            if (param == 0)
+              newActiveFunctions |= 0x0F;
+            else if (param <= NUM_STICKS)
+              newActiveFunctions |= (1 << (param - 1));
+            else if (param == NUM_STICKS + 1)
+              newActiveFunctions |= (1u << FUNCTION_TRAINER_CHANNELS);
             break;
           }
 
           case FUNC_INSTANT_TRIM:
-            newActiveFunctions |= (1 << FUNCTION_INSTANT_TRIM);
+            newActiveFunctions |= (1u << FUNCTION_INSTANT_TRIM);
             if (!isFunctionActive(FUNCTION_INSTANT_TRIM)) {
               if (IS_INSTANT_TRIM_ALLOWED()) {
                 instantTrim();
@@ -196,20 +196,9 @@ void evalFunctions(const CustomFunctionData * functions, CustomFunctionsContext 
                   mainRequestFlags |= (1 << REQUEST_FLIGHT_RESET);     // on systems with threads flightReset() must not be called from the mixers thread!
                 }
                 break;
-#if defined(TELEMETRY_FRSKY)
               case FUNC_RESET_TELEMETRY:
                 telemetryReset();
                 break;
-#endif
-                  
-#if ROTARY_ENCODERS > 0
-              case FUNC_RESET_ROTENC1:
-#if ROTARY_ENCODERS > 1
-              case FUNC_RESET_ROTENC2:
-#endif
-                rotencValue[CFN_PARAM(cfn)-FUNC_RESET_ROTENC1] = 0;
-                break;
-#endif
             }
             if (CFN_PARAM(cfn)>=FUNC_RESET_PARAM_FIRST_TELEM) {
               uint8_t item = CFN_PARAM(cfn)-FUNC_RESET_PARAM_FIRST_TELEM;
@@ -233,7 +222,7 @@ void evalFunctions(const CustomFunctionData * functions, CustomFunctionsContext 
           {
             unsigned int moduleIndex = CFN_PARAM(cfn);
             if (moduleIndex < NUM_MODULES) {
-              moduleFlag[moduleIndex] = 1 + CFN_FUNC(cfn) - FUNC_RANGECHECK;
+              moduleState[moduleIndex].mode = 1 + CFN_FUNC(cfn) - FUNC_RANGECHECK;
             }
             break;
           }
@@ -255,14 +244,6 @@ void evalFunctions(const CustomFunctionData * functions, CustomFunctionsContext 
             else if (CFN_PARAM(cfn) >= MIXSRC_FIRST_TRIM && CFN_PARAM(cfn) <= MIXSRC_LAST_TRIM) {
               trimGvar[CFN_PARAM(cfn)-MIXSRC_FIRST_TRIM] = CFN_GVAR_INDEX(cfn);
             }
-#if defined(ROTARY_ENCODERS)
-            else if (CFN_PARAM(cfn) >= MIXSRC_REa && CFN_PARAM(cfn) < MIXSRC_TrimRud) {
-              int8_t scroll = rePreviousValues[CFN_PARAM(cfn)-MIXSRC_REa] - (rotencValue[CFN_PARAM(cfn)-MIXSRC_REa] / ROTARY_ENCODER_GRANULARITY);
-              if (scroll) {
-                SET_GVAR(CFN_GVAR_INDEX(cfn), limit<int16_t>(MODEL_GVAR_MIN(CFN_GVAR_INDEX(cfn)), GVAR_VALUE(CFN_GVAR_INDEX(cfn), getGVarFlightMode(mixerCurrentFlightMode, CFN_GVAR_INDEX(cfn))) + scroll, MODEL_GVAR_MAX(CFN_GVAR_INDEX(cfn))), mixerCurrentFlightMode);
-              }
-            }
-#endif
             else {
               SET_GVAR(CFN_GVAR_INDEX(cfn), limit<int16_t>(MODEL_GVAR_MIN(CFN_GVAR_INDEX(cfn)), calcRESXto100(getValue(CFN_PARAM(cfn))), MODEL_GVAR_MAX(CFN_GVAR_INDEX(cfn))), mixerCurrentFlightMode);
             }
@@ -357,7 +338,7 @@ void evalFunctions(const CustomFunctionData * functions, CustomFunctionsContext 
           }
 #endif
 
-#if defined(TELEMETRY_FRSKY) && defined(VARIO)
+#if defined(VARIO)
           case FUNC_VARIO:
             newActiveFunctions |= (1 << FUNCTION_VARIO);
             break;
@@ -377,13 +358,11 @@ void evalFunctions(const CustomFunctionData * functions, CustomFunctionsContext 
             newActiveFunctions |= (1 << FUNCTION_BACKLIGHT);
             break;
 
-#if defined(PCBTARANIS)
           case FUNC_SCREENSHOT:
             if (!(functionsContext.activeSwitches & switch_mask)) {
               mainRequestFlags |= (1 << REQUEST_SCREENSHOT);
             }
             break;
-#endif
 
 #if defined(DEBUG)
           case FUNC_TEST:
@@ -404,7 +383,7 @@ void evalFunctions(const CustomFunctionData * functions, CustomFunctionsContext 
             {
               unsigned int moduleIndex = CFN_PARAM(cfn);
               if (moduleIndex < NUM_MODULES) {
-                moduleFlag[moduleIndex] = 0;
+                moduleState[moduleIndex].mode = 0;
               }
               break;
             }
@@ -417,11 +396,5 @@ void evalFunctions(const CustomFunctionData * functions, CustomFunctionsContext 
 
   functionsContext.activeSwitches   = newActiveSwitches;
   functionsContext.activeFunctions  = newActiveFunctions;
-
-#if defined(ROTARY_ENCODERS) && defined(GVARS)
-  for (uint8_t i=0; i<ROTARY_ENCODERS; i++) {
-    rePreviousValues[i] = (rotencValue[i] / ROTARY_ENCODER_GRANULARITY);
-  }
-#endif
 }
 

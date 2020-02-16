@@ -2,7 +2,6 @@
  * Copyright (C) OpenTX
  *
  * Based on code named
- *   cleanflight - https://github.com/cleanflight
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -19,28 +18,14 @@
  * GNU General Public License for more details.
  */
 
-#ifndef _GPS_H_
-#define _GPS_H_
+#ifndef CHKSIZE_H
+#define CHKSIZE_H
 
 #include <inttypes.h>
 
-struct gpsdata_t
-{
-  int32_t longitude;              // degrees * 1.000.000
-  int32_t latitude;               // degrees * 1.000.000
-  uint8_t fix;
-  uint8_t numSat;
-  uint32_t packetCount;
-  uint32_t errorCount;
-  uint16_t altitude;              // altitude in 0.1m
-  uint16_t speed;                 // speed in 0.1m/s
-  uint16_t groundCourse;          // degrees * 10
-  uint16_t hdop;
-};
+template <typename ToCheck, size_t expectedSize, size_t realSize = sizeof(ToCheck)>
+void check_size() {
+  static_assert(expectedSize == realSize, "struct size changed");
+}
 
-extern gpsdata_t gpsData;
-void gpsWakeup();
-
-void gpsSendFrame(const char * frame);
-
-#endif // _GPS_H_
+#endif
