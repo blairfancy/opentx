@@ -666,6 +666,24 @@ bool isExternalModuleAvailable(int moduleType)
   return true;
 }
 
+#if defined(PCBSKY9X)
+bool isExtraModuleAvailable(int moduleType)
+{
+	
+  if (moduleType == MODULE_TYPE_NONE)
+    return true;
+	
+#if !defined(PPM)
+  if (moduleType == MODULE_TYPE_PPM)
+    return true;
+#endif
+
+  return false;
+}
+#endif
+
+
+
 bool isRfProtocolAvailable(int protocol)
 {
 #if defined(CROSSFIRE)
